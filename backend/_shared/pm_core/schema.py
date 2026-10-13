@@ -1,0 +1,222 @@
+"""
+Database schema migrations and demo seed data.
+
+Migrations run from inside the Lambda on cold start because AWS Aurora is not
+reachable from the developer machine. They are idempotent: each version is
+recorded in ``schema_version`` and a Postgres advisory lock stops concurrent
+cold starts from racing each other.
+"""
+
+import logging
+
+import psycopg
+
+from pm_core import passwords
+
+logger = logging.getLogger(__name__)
+
+# Arbitrary constant used as the advisory lock key for migrations.
+_MIGRATION_LOCK_KEY = 727_001
+
+MIGRATIONS: list[tuple[int, str]] = [
+    (
+        1,
+        """
+        CREATE TABLE app_settings (
+            key   VARCHAR(100) PRIMARY KEY,
+            value TEXT NOT NULL
+        );
+
+        CREATE TABLE users (
+            id            BIGSERIAL PRIMARY KEY,
+            employee_id   VARCHAR(20)  NOT NULL UNIQUE,
+            first_name    VARCHAR(100) NOT NULL,
+            last_name     VARCHAR(100) NOT NULL,
+            email         VARCHAR(254) NOT NULL,
+            job_title     VARCHAR(120) NOT NULL DEFAULT '',
+            salary        NUMERIC(12, 2) NOT NULL DEFAULT 0 CHECK (salary >= 0),
+            role          VARCHAR(10)  NOT NULL CHECK (role IN ('admin', 'manager', 'employee')),
+            manager_id    BIGINT REFERENCES users (id),
+            password_hash TEXT NOT NULL,
+            is_active     BOOLEAN NOT NULL DEFAULT TRUE,
+            created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+            updated_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+            CHECK (manager_id IS NULL OR manager_id <> id)
+        );
+        CREATE UNIQUE INDEX users_email_lower_key ON users (lower(email));
+
+        CREATE TABLE projects (
+            id                 BIGSERIAL PRIMARY KEY,
+            name               VARCHAR(200) NOT NULL,
+            description        TEXT NOT NULL DEFAULT '',
+            start_date         DATE NOT NULL,
+            predicted_end_date DATE NOT NULL,
+            manager_id         BIGINT NOT NULL REFERENCES users (id),
+            budget             NUMERIC(14, 2) NOT NULL CHECK (budget >= 0),
+            status             VARCHAR(20) NOT NULL DEFAULT 'planned'
+                               CHECK (status IN ('planned', 'active', 'on_hold', 'completed')),
+            is_archived        BOOLEAN NOT NULL DEFAULT FALSE,
+            archived_at        TIMESTAMPTZ,
+            created_by         BIGINT REFERENCES users (id),
+            created_at         TIMESTAMPTZ NOT NULL DEFAULT now(),
+            updated_at         TIMESTAMPTZ NOT NULL DEFAULT now(),
+            CHECK (predicted_end_date >= start_date)
+        );
+        CREATE INDEX projects_manager_idx ON projects (manager_id);
+
+        CREATE TABLE project_assignments (
+            id             BIGSERIAL PRIMARY KEY,
+            project_id     BIGINT NOT NULL REFERENCES projects (id),
+            user_id        BIGINT NOT NULL REFERENCES users (id),
+            hours_per_week NUMERIC(4, 1) NOT NULL CHECK (hours_per_week > 0 AND hours_per_week <= 40),
+            assigned_by    BIGINT REFERENCES users (id),
+            created_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
+            updated_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
+            UNIQUE (project_id, user_id)
+        );
+        CREATE INDEX project_assignments_user_idx ON project_assignments (user_id);
+
+        CREATE TABLE milestones (
+            id           BIGSERIAL PRIMARY KEY,
+            project_id   BIGINT NOT NULL REFERENCES projects (id),
+            title        VARCHAR(200) NOT NULL,
+            description  TEXT NOT NULL DEFAULT '',
+            start_date   DATE NOT NULL,
+            due_date     DATE NOT NULL,
+            status       VARCHAR(20) NOT NULL DEFAULT 'not_started'
+                         CHECK (status IN ('not_started', 'in_progress', 'completed', 'blocked')),
+            completed_at TIMESTAMPTZ,
+            created_by   BIGINT REFERENCES users (id),
+            created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+            updated_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+            CHECK (due_date >= start_date)
+        );
+        CREATE INDEX milestones_project_idx ON milestones (project_id);
+
+        CREATE TABLE milestone_dependencies (
+            milestone_id  BIGINT NOT NULL REFERENCES milestones (id) ON DELETE CASCADE,
+            depends_on_id BIGINT NOT NULL REFERENCES milestones (id) ON DELETE CASCADE,
+            PRIMARY KEY (milestone_id, depends_on_id),
+            CHECK (milestone_id <> depends_on_id)
+        );
+
+        CREATE TABLE project_requests (
+            id                 BIGSERIAL PRIMARY KEY,
+            requested_by       BIGINT NOT NULL REFERENCES users (id),
+            name               VARCHAR(200) NOT NULL,
+            description        TEXT NOT NULL DEFAULT '',
+            start_date         DATE NOT NULL,
+            predicted_end_date DATE NOT NULL,
+            budget             NUMERIC(14, 2) NOT NULL CHECK (budget >= 0),
+            justification      TEXT NOT NULL DEFAULT '',
+            status             VARCHAR(10) NOT NULL DEFAULT 'pending'
+                               CHECK (status IN ('pending', 'approved', 'rejected')),
+            reviewed_by        BIGINT REFERENCES users (id),
+            reviewed_at        TIMESTAMPTZ,
+            review_note        TEXT NOT NULL DEFAULT '',
+            project_id         BIGINT REFERENCES projects (id),
+            created_at         TIMESTAMPTZ NOT NULL DEFAULT now(),
+            CHECK (predicted_end_date >= start_date)
+        );
+
+        CREATE TABLE audit_log (
+            id                BIGSERIAL PRIMARY KEY,
+            occurred_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
+            actor_id          BIGINT REFERENCES users (id),
+            actor_employee_id VARCHAR(20),
+            actor_name        VARCHAR(201),
+            actor_role        VARCHAR(10),
+            action            VARCHAR(60) NOT NULL,
+            entity_type       VARCHAR(40) NOT NULL,
+            entity_id         BIGINT,
+            project_id        BIGINT,
+            summary           TEXT NOT NULL,
+            changes           JSONB NOT NULL DEFAULT '{}'::jsonb,
+            outcome           VARCHAR(10) NOT NULL DEFAULT 'success'
+                              CHECK (outcome IN ('success', 'denied'))
+        );
+        CREATE INDEX audit_log_occurred_idx ON audit_log (occurred_at DESC);
+        CREATE INDEX audit_log_actor_idx ON audit_log (actor_id);
+        CREATE INDEX audit_log_project_idx ON audit_log (project_id);
+        CREATE INDEX audit_log_action_idx ON audit_log (action);
+
+        -- The audit log is append-only: block UPDATE, DELETE and TRUNCATE at the database level.
+        CREATE FUNCTION audit_log_immutable() RETURNS trigger AS $$
+        BEGIN
+            RAISE EXCEPTION 'audit_log is append-only';
+        END;
+        $$ LANGUAGE plpgsql;
+
+        CREATE TRIGGER audit_log_no_modify
+            BEFORE UPDATE OR DELETE ON audit_log
+            FOR EACH ROW EXECUTE FUNCTION audit_log_immutable();
+        CREATE TRIGGER audit_log_no_truncate
+            BEFORE TRUNCATE ON audit_log
+            FOR EACH STATEMENT EXECUTE FUNCTION audit_log_immutable();
+        """,
+    ),
+]
+
+# Demo accounts created on an empty database. Documented in the README so the
+# app can be demoed immediately; change these passwords before real use.
+DEMO_USERS: list[dict] = [
+    {
+        "employee_id": "ADM001", "first_name": "Alex", "last_name": "Admin",
+        "email": "alex.admin@example.com", "job_title": "Administrator",
+        "salary": 120000, "role": "admin", "password": "Admin1",
+    },
+    {
+        "employee_id": "MGR001", "first_name": "Morgan", "last_name": "Manager",
+        "email": "morgan.manager@example.com", "job_title": "Engineering Manager",
+        "salary": 110000, "role": "manager", "password": "Mngr01",
+    },
+    {
+        "employee_id": "EMP001", "first_name": "Eli", "last_name": "Employee",
+        "email": "eli.employee@example.com", "job_title": "Software Engineer",
+        "salary": 90000, "role": "employee", "password": "Empl01",
+        "manager_employee_id": "MGR001",
+    },
+]
+
+
+def ensure_schema(conn: psycopg.Connection) -> None:
+    """Apply any pending migrations and seed demo data on an empty database."""
+    with conn.transaction(), conn.cursor() as cur:
+        cur.execute("SELECT pg_advisory_xact_lock(%s)", (_MIGRATION_LOCK_KEY,))
+        cur.execute(
+            "CREATE TABLE IF NOT EXISTS schema_version ("
+            " version INT PRIMARY KEY, applied_at TIMESTAMPTZ NOT NULL DEFAULT now())"
+        )
+        cur.execute("SELECT COALESCE(MAX(version), 0) AS version FROM schema_version")
+        current = cur.fetchone()["version"]
+        for version, sql in MIGRATIONS:
+            if version > current:
+                logger.info("Applying schema migration %s", version)
+                cur.execute(sql)
+                cur.execute("INSERT INTO schema_version (version) VALUES (%s)", (version,))
+        _seed_demo_users(cur)
+
+
+def _seed_demo_users(cur: psycopg.Cursor) -> None:
+    """Insert the demo accounts if the users table is empty."""
+    cur.execute("SELECT EXISTS (SELECT 1 FROM users) AS has_users")
+    if cur.fetchone()["has_users"]:
+        return
+    logger.info("Seeding demo users")
+    ids: dict[str, int] = {}
+    for user in DEMO_USERS:
+        manager_id = ids.get(user.get("manager_employee_id", ""))
+        cur.execute(
+            """
+            INSERT INTO users (employee_id, first_name, last_name, email, job_title,
+                               salary, role, manager_id, password_hash)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+            RETURNING id
+            """,
+            (
+                user["employee_id"], user["first_name"], user["last_name"], user["email"],
+                user["job_title"], user["salary"], user["role"], manager_id,
+                passwords.hash_password(user["password"]),
+            ),
+        )
+        ids[user["employee_id"]] = cur.fetchone()["id"]

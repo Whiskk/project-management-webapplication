@@ -327,11 +327,17 @@ else
     echo -e "  Detected Mac/Windows - using host: host.docker.internal"
 fi
 
+# Copy shared backend code (backend/_shared/pm_core) into each Python service
+"$SCRIPT_DIR/sync-shared.sh"
+
 # Install pip requirements into each Python service directory for hot-reload
 # Skip if requirements.txt hasn't changed since last install (avoids slow PyPI lookups)
+# Wheels are pinned to the Lambda runtime (Python 3.13, manylinux x86_64) so the
+# packages work inside the Lambda container whatever Python version runs locally.
 shopt -s nullglob
 for req in "$PROJECT_ROOT"/backend/*/requirements.txt; do
     svc_dir="$(dirname "$req")"
+    case "$(basename "$svc_dir")" in _*|.*) continue ;; esac
     REQS_HASH=$(md5sum "$req" 2>/dev/null | cut -d' ' -f1)
     HASH_FILE="$svc_dir/.pip_installed"
     if [ "$(cat "$HASH_FILE" 2>/dev/null)" = "$REQS_HASH" ]; then
@@ -339,8 +345,13 @@ for req in "$PROJECT_ROOT"/backend/*/requirements.txt; do
         continue
     fi
     echo -e "  Installing pip requirements for $(basename "$svc_dir")..."
-    pip install --quiet --target="$svc_dir" -r "$req" 2>/dev/null || true
-    echo "$REQS_HASH" > "$HASH_FILE"
+    if python3 -m pip install --quiet --upgrade --target="$svc_dir" \
+        --platform manylinux2014_x86_64 --python-version 3.13 \
+        --implementation cp --only-binary=:all: -r "$req"; then
+        echo "$REQS_HASH" > "$HASH_FILE"
+    else
+        echo -e "  ⚠ pip install failed for $(basename "$svc_dir")"
+    fi
 done
 
 # Install npm dependencies into each Node.js service directory for hot-reload
