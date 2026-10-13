@@ -55,6 +55,7 @@ class Request:
     query: dict[str, str]
     raw_body: str
     request_id: str
+    service: str = ""
     params: dict[str, str] = field(default_factory=dict)
     actor: Any = None
     _body: Any = field(default=_MISSING, repr=False)
@@ -218,6 +219,7 @@ class Router:
             query=dict(event.get("queryStringParameters") or {}),
             raw_body=raw_body,
             request_id=request_id,
+            service=self.service,
         )
 
 

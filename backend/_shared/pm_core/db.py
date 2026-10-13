@@ -59,3 +59,20 @@ def transaction() -> Iterator[psycopg.Cursor]:
         logger.exception("Database connection error - resetting connection")
         reset()
         raise
+
+
+@contextmanager
+def independent_transaction() -> Iterator[psycopg.Cursor]:
+    """
+    Yield a cursor on a separate, short-lived connection.
+
+    Used for writes that must commit even when the surrounding request's
+    transaction rolls back (e.g. auditing a denied attempt mid-transaction).
+    """
+    get_connection()  # ensure the schema exists
+    with (
+        psycopg.connect(config.postgres_conninfo(), autocommit=True, row_factory=dict_row) as conn,
+        conn.transaction(),
+        conn.cursor() as cur,
+    ):
+        yield cur

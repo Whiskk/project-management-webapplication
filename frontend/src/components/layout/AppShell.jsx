@@ -11,8 +11,10 @@ import ListItemIcon from '@mui/material/ListItemIcon';
 import ListItemText from '@mui/material/ListItemText';
 import Toolbar from '@mui/material/Toolbar';
 import Typography from '@mui/material/Typography';
+import AccountCircleIcon from '@mui/icons-material/AccountCircle';
 import DashboardIcon from '@mui/icons-material/Dashboard';
 import MenuIcon from '@mui/icons-material/Menu';
+import PeopleIcon from '@mui/icons-material/People';
 import { useAuth } from '../../auth/authContext';
 import { can } from '../../auth/permissions';
 import UserMenu from './UserMenu';
@@ -20,7 +22,11 @@ import UserMenu from './UserMenu';
 const DRAWER_WIDTH = 240;
 
 // Navigation entries. Items with a `permission` are only shown to roles that have it.
-const NAV_ITEMS = [{ to: '/', label: 'Dashboard', icon: <DashboardIcon /> }];
+const NAV_ITEMS = [
+  { to: '/', label: 'Dashboard', icon: <DashboardIcon /> },
+  { to: '/users', label: 'Users', icon: <PeopleIcon />, permission: 'users.view' },
+  { to: '/profile', label: 'My profile', icon: <AccountCircleIcon /> },
+];
 
 /** Responsive app layout: permanent sidebar on desktop, slide-out drawer on mobile. */
 export default function AppShell() {
@@ -38,7 +44,7 @@ export default function AppShell() {
             key={item.to}
             component={NavLink}
             to={item.to}
-            end
+            end={item.to === '/'}
             onClick={() => setMobileOpen(false)}
             sx={{ '&.active': { bgcolor: 'action.selected', fontWeight: 600 } }}
           >

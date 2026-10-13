@@ -62,7 +62,7 @@ def test_denied_write_returns_consistent_error_and_is_audited(fresh_db: None) ->
     [entry] = denied_entries()
     assert entry["actor_employee_id"] == "EMP001"
     assert entry["action"] == "access.denied"
-    assert "POST /" in entry["summary"]
+    assert entry["summary"] == "Denied POST /things (requires role: admin, manager)"
 
 
 def test_denied_read_is_not_audited(fresh_db: None) -> None:

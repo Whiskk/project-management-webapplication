@@ -3,7 +3,7 @@ import { createContext, useContext } from 'react';
 export const AuthContext = createContext(null);
 
 /**
- * Access the auth state: `{ status, user, login, logout }`.
+ * Access the auth state: `{ status, user, login, logout, updateUser }`.
  * `status` is 'initializing' | 'authenticated' | 'anonymous'.
  */
 export function useAuth() {

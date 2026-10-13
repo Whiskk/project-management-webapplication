@@ -47,6 +47,11 @@ export default function AuthProvider({ children }) {
     setState({ status: 'anonymous', user: null });
   }, []);
 
-  const value = useMemo(() => ({ ...state, login, logout }), [state, login, logout]);
+  /** Merge updated profile fields into the signed-in user (e.g. after editing their profile). */
+  const updateUser = useCallback((changes) => {
+    setState((current) => (current.user ? { ...current, user: { ...current.user, ...changes } } : current));
+  }, []);
+
+  const value = useMemo(() => ({ ...state, login, logout, updateUser }), [state, login, logout, updateUser]);
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

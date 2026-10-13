@@ -13,6 +13,7 @@ export const ROLE_LABELS = {
 
 const PERMISSIONS = {
   'audit.view': ['admin'],
+  'users.view': ['admin', 'manager'],
   'users.manage': ['admin'],
   'projects.create': ['admin'],
   'projects.archive': ['admin'],

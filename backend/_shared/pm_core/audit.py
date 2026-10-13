@@ -3,7 +3,7 @@ Append-only audit trail.
 
 ``record`` must be called with the *same cursor* used for the change it
 describes, so the change and its audit entry commit (or roll back) together.
-``record_denied`` uses its own transaction because the denied request's
+``record_denied`` uses its own connection because the denied request's
 transaction is rolled back.
 """
 
@@ -129,8 +129,11 @@ def record_denied(
     project_id: int | None = None,
     actor_employee_id: str | None = None,
 ) -> None:
-    """Record a denied attempt in its own transaction (the request's one rolls back)."""
-    with db.transaction() as cur:
+    """
+    Record a denied attempt on its own connection, so it is kept even if it
+    happens inside a request transaction that is about to roll back.
+    """
+    with db.independent_transaction() as cur:
         record(
             cur, actor, action, entity_type, entity_id, summary,
             project_id=project_id, outcome="denied", actor_employee_id=actor_employee_id,

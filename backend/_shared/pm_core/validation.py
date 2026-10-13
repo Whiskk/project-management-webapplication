@@ -138,3 +138,31 @@ def parse_id(raw: str, name: str = "id") -> int:
     if not raw.isdigit() or int(raw) <= 0:
         raise ValidationError({name: "Must be a positive integer"})
     return int(raw)
+
+
+def parse_pagination(query: dict[str, str], default_size: int = 25, max_size: int = 100) -> tuple[int, int]:
+    """
+    Read ``page`` (1-based) and ``page_size`` query parameters.
+
+    Returns:
+        ``(limit, offset)`` ready for SQL.
+    """
+    errors: dict[str, str] = {}
+    page_raw = query.get("page", "1")
+    size_raw = query.get("page_size", str(default_size))
+    if not page_raw.isdigit() or int(page_raw) < 1:
+        errors["page"] = "Must be a positive integer"
+    if not size_raw.isdigit() or not 1 <= int(size_raw) <= max_size:
+        errors["page_size"] = f"Must be between 1 and {max_size}"
+    if errors:
+        raise ValidationError(errors)
+    size = int(size_raw)
+    return size, (int(page_raw) - 1) * size
+
+
+def parse_choice(query: dict[str, str], name: str, choices: tuple[str, ...], default: str | None = None) -> str | None:
+    """Read an optional query parameter restricted to ``choices``."""
+    value = query.get(name, default)
+    if value is not None and value not in choices:
+        raise ValidationError({name: f"Must be one of: {', '.join(choices)}"})
+    return value

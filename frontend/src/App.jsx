@@ -1,9 +1,12 @@
 import { Route, Routes } from 'react-router';
 import RequireAuth from './auth/RequireAuth';
+import RequirePermission from './auth/RequirePermission';
 import AppShell from './components/layout/AppShell';
 import HomePage from './pages/HomePage';
 import LoginPage from './pages/LoginPage';
 import NotFoundPage from './pages/NotFoundPage';
+import ProfilePage from './pages/ProfilePage';
+import UsersPage from './pages/UsersPage';
 
 export default function App() {
   return (
@@ -12,6 +15,10 @@ export default function App() {
       <Route element={<RequireAuth />}>
         <Route element={<AppShell />}>
           <Route index element={<HomePage />} />
+          <Route path="profile" element={<ProfilePage />} />
+          <Route element={<RequirePermission permission="users.view" />}>
+            <Route path="users" element={<UsersPage />} />
+          </Route>
           <Route path="*" element={<NotFoundPage />} />
         </Route>
       </Route>

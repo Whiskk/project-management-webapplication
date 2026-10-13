@@ -10,6 +10,8 @@ export default defineConfig({
   test: {
     environment: 'jsdom',
     setupFiles: './src/test/setup.js',
+    // Ignore the API URL from a generated .env.local so tests are deterministic.
+    env: { VITE_API_URL: '' },
     css: false,
     coverage: {
       include: ['src/**/*.{js,jsx}'],

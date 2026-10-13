@@ -1,2 +1,2 @@
 [bandit]
-exclude = ./backend/tests,./backend/.venv,./tests,./.venv
+exclude = ./backend/tests,./backend/.venv,./tests,./.venv,*/psycopg/*,*/psycopg_binary/*,*/psycopg_binary.libs/*,*/jwt/*,*/typing_extensions.py

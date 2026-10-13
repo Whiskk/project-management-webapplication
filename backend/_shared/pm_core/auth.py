@@ -170,7 +170,7 @@ def deny(request: Request, reason: str, project_id: int | None = None) -> None:
             "access.denied",
             "endpoint",
             None,
-            f"Denied {request.method} {request.path} ({reason})",
+            f"Denied {request.method} /{request.service}{request.path.rstrip('/')} ({reason})",
             project_id=project_id,
         )
     raise Forbidden()
