@@ -152,6 +152,30 @@ def _blockers_for_leaving_manager_role(cur: psycopg.Cursor, user_id: int) -> lis
     return reasons
 
 
+def _blockers_for_leaving_employee_role(cur: psycopg.Cursor, user_id: int) -> list[str]:
+    """Reasons an employee cannot be deactivated or change role: current project assignments."""
+    cur.execute(
+        """
+        SELECT COUNT(*) AS n FROM project_assignments a JOIN projects p ON p.id = a.project_id
+        WHERE a.user_id = %s AND NOT p.is_archived AND p.status <> 'completed'
+        """,
+        (user_id,),
+    )
+    projects = cur.fetchone()["n"]
+    if projects:
+        return [f"they are assigned to {projects} current project(s) - remove them from those projects first"]
+    return []
+
+
+def _role_exit_blockers(cur: psycopg.Cursor, row: dict) -> list[str]:
+    """Reasons a user cannot leave their current role (role change or deactivation)."""
+    if row["role"] == "manager":
+        return _blockers_for_leaving_manager_role(cur, row["id"])
+    if row["role"] == "employee":
+        return _blockers_for_leaving_employee_role(cur, row["id"])
+    return []
+
+
 def _check_not_last_admin(cur: psycopg.Cursor, user_id: int) -> None:
     cur.execute("SELECT COUNT(*) AS n FROM users WHERE role = 'admin' AND is_active AND id <> %s", (user_id,))
     if cur.fetchone()["n"] == 0:
@@ -317,8 +341,8 @@ def _check_admin_update(cur: psycopg.Cursor, actor: Actor, before: dict, data: d
         raise Conflict("You cannot change your own role")
     if before["role"] == "admin" and new_role != "admin":
         _check_not_last_admin(cur, before["id"])
-    if before["role"] == "manager" and new_role != "manager":
-        blockers = _blockers_for_leaving_manager_role(cur, before["id"])
+    if new_role != before["role"]:
+        blockers = _role_exit_blockers(cur, before)
         if blockers:
             raise Conflict(f"Cannot change role: {'; '.join(blockers)}")
     if "role" in data or "manager_id" in data:
@@ -369,10 +393,9 @@ def deactivate_user(request: Request) -> Response:
             raise Conflict("User is already inactive")
         if before["role"] == "admin":
             _check_not_last_admin(cur, before["id"])
-        if before["role"] == "manager":
-            blockers = _blockers_for_leaving_manager_role(cur, before["id"])
-            if blockers:
-                raise Conflict(f"Cannot deactivate: {'; '.join(blockers)}")
+        blockers = _role_exit_blockers(cur, before)
+        if blockers:
+            raise Conflict(f"Cannot deactivate: {'; '.join(blockers)}")
         after = _apply_update(cur, before, {"is_active": False})
         audit.record(
             cur, request.actor, "user.deactivate", "user", after["id"],

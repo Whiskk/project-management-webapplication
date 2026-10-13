@@ -2,6 +2,7 @@ import { useCallback, useState } from 'react';
 import { Link as RouterLink, useNavigate } from 'react-router';
 import Alert from '@mui/material/Alert';
 import Button from '@mui/material/Button';
+import Chip from '@mui/material/Chip';
 import InputAdornment from '@mui/material/InputAdornment';
 import MenuItem from '@mui/material/MenuItem';
 import Paper from '@mui/material/Paper';
@@ -27,7 +28,7 @@ import { PROJECT_STATUSES } from '../components/projects/projectStatuses';
 import useApiResource from '../hooks/useApiResource';
 import useDebouncedValue from '../hooks/useDebouncedValue';
 import { projectsApi } from '../services/projectsApi';
-import { formatCurrency, formatDate } from '../utils/format';
+import { formatCurrency, formatDate, formatHours } from '../utils/format';
 
 const DESKTOP_ONLY = { display: { xs: 'none', md: 'table-cell' } };
 
@@ -69,7 +70,7 @@ export default function ProjectsPage() {
     setPage(0);
   };
 
-  const columnCount = showBudget ? 7 : 6;
+  const columnCount = 7;
 
   return (
     <Stack spacing={3}>
@@ -124,7 +125,9 @@ export default function ProjectsPage() {
                   <TableCell sx={DESKTOP_ONLY}>Start</TableCell>
                   <TableCell>Predicted end</TableCell>
                   <TableCell sx={DESKTOP_ONLY} align="right">Team</TableCell>
-                  {showBudget && <TableCell sx={DESKTOP_ONLY} align="right">Budget</TableCell>}
+                  {showBudget
+                    ? <TableCell sx={DESKTOP_ONLY} align="right">Budget</TableCell>
+                    : <TableCell align="right">My hours / week</TableCell>}
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -170,7 +173,14 @@ export default function ProjectsPage() {
                     <TableCell sx={DESKTOP_ONLY}>{formatDate(project.start_date)}</TableCell>
                     <TableCell>{formatDate(project.predicted_end_date)}</TableCell>
                     <TableCell sx={DESKTOP_ONLY} align="right">{project.team_size}</TableCell>
-                    {showBudget && <TableCell sx={DESKTOP_ONLY} align="right">{formatCurrency(project.budget)}</TableCell>}
+                    {showBudget ? (
+                      <TableCell sx={DESKTOP_ONLY} align="right">
+                        {formatCurrency(project.budget)}
+                        {project.over_budget && <Chip size="small" color="error" label="Over budget" sx={{ ml: 1 }} />}
+                      </TableCell>
+                    ) : (
+                      <TableCell align="right">{formatHours(project.my_hours_per_week)}</TableCell>
+                    )}
                   </TableRow>
                 ))}
               </TableBody>

@@ -4,7 +4,9 @@ import Alert from '@mui/material/Alert';
 import Button from '@mui/material/Button';
 import Card from '@mui/material/Card';
 import CardContent from '@mui/material/CardContent';
+import Chip from '@mui/material/Chip';
 import Grid from '@mui/material/Grid';
+import LinearProgress from '@mui/material/LinearProgress';
 import Link from '@mui/material/Link';
 import Skeleton from '@mui/material/Skeleton';
 import Stack from '@mui/material/Stack';
@@ -20,9 +22,10 @@ import { useNotify } from '../components/feedback/notificationContext';
 import ProjectFormDialog from '../components/projects/ProjectFormDialog';
 import ProjectStatusChip from '../components/projects/ProjectStatusChip';
 import ReactivateProjectDialog from '../components/projects/ReactivateProjectDialog';
+import TeamSection from '../components/projects/TeamSection';
 import useApiResource from '../hooks/useApiResource';
 import { projectsApi } from '../services/projectsApi';
-import { formatCurrency, formatDate } from '../utils/format';
+import { formatCurrency, formatDate, formatHours } from '../utils/format';
 
 function Stat({ label, value, hint }) {
   return (
@@ -36,7 +39,35 @@ function Stat({ label, value, hint }) {
   );
 }
 
-/** Project overview with role-appropriate actions (edit, archive, reactivate). */
+/** Budget against projected labour cost, with a usage bar. */
+function BudgetStat({ project }) {
+  const budget = Number(project.budget);
+  const cost = Number(project.projected_cost);
+  const used = budget > 0 ? Math.min((cost / budget) * 100, 100) : cost > 0 ? 100 : 0;
+  return (
+    <Card sx={{ height: '100%' }}>
+      <CardContent>
+        <Stack direction="row" justifyContent="space-between" alignItems="center">
+          <Typography variant="caption" color="text.secondary">Budget</Typography>
+          {project.over_budget && <Chip size="small" color="error" label="Over budget" />}
+        </Stack>
+        <Typography variant="h3" component="p">{formatCurrency(budget)}</Typography>
+        <LinearProgress
+          variant="determinate"
+          value={used}
+          color={project.over_budget ? 'error' : used > 90 ? 'warning' : 'primary'}
+          sx={{ my: 1, height: 6, borderRadius: 3 }}
+          aria-label="Budget used"
+        />
+        <Typography variant="body2" color={project.over_budget ? 'error.main' : 'text.secondary'}>
+          {formatCurrency(cost)} projected labour · {formatCurrency(project.remaining_budget)} left
+        </Typography>
+      </CardContent>
+    </Card>
+  );
+}
+
+/** Project overview with role-appropriate actions (edit, archive, reactivate) and the team. */
 export default function ProjectDetailPage() {
   const { projectId } = useParams();
   const { user } = useAuth();
@@ -73,6 +104,7 @@ export default function ProjectDetailPage() {
   const data = project.data;
   const canEdit = !data.is_archived && (user.role === 'admin' || (user.role === 'manager' && data.manager_id === user.id));
   const canArchive = can(user, 'projects.archive');
+  const showMoney = data.budget !== null;
 
   const archive = async () => {
     setBusy(true);
@@ -136,11 +168,18 @@ export default function ProjectDetailPage() {
           <Stat label="Capacity per person" value={`${data.capacity_hours} h`} hint="8 hours per working day" />
         </Grid>
         <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-          {data.budget !== null
-            ? <Stat label="Budget" value={formatCurrency(data.budget)} hint={`Team of ${data.team_size}`} />
-            : <Stat label="Team" value={data.team_size} hint="people assigned" />}
+          {showMoney
+            ? <BudgetStat project={data} />
+            : <Stat label="Your hours" value={formatHours(data.my_hours_per_week)} hint={`per week · team of ${data.team_size}`} />}
         </Grid>
       </Grid>
+
+      <TeamSection
+        project={data}
+        canStaff={canEdit}
+        showCosts={showMoney}
+        onChanged={project.reload}
+      />
 
       <Card>
         <CardContent>

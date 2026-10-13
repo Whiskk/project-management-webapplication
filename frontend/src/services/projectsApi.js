@@ -8,4 +8,9 @@ export const projectsApi = {
   update: (id, data) => api.patch('projects', `/${id}`, data),
   archive: (id) => api.post('projects', `/${id}/archive`),
   reactivate: (id, data = {}) => api.post('projects', `/${id}/reactivate`, data),
+  team: (id, signal) => api.get('projects', `/${id}/assignments`, { signal }),
+  staffingOptions: (id, signal) => api.get('projects', `/${id}/staffing-options`, { signal }),
+  assign: (id, data) => api.post('projects', `/${id}/assignments`, data),
+  updateAssignment: (id, assignmentId, data) => api.patch('projects', `/${id}/assignments/${assignmentId}`, data),
+  removeAssignment: (id, assignmentId) => api.delete('projects', `/${id}/assignments/${assignmentId}`),
 };

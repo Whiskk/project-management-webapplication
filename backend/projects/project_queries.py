@@ -8,10 +8,12 @@ Visibility:
 Projects a user cannot see are reported as 404 so their existence is not leaked.
 """
 
+from decimal import Decimal
+
 import psycopg
 from psycopg import sql
 
-from pm_core import workdays
+from pm_core import budget, workdays
 from pm_core.audit import Actor
 from pm_core.auth import deny
 from pm_core.errors import NotFound
@@ -22,7 +24,10 @@ SELECT_PROJECT = sql.SQL(
     SELECT p.*,
            m.first_name || ' ' || m.last_name AS manager_name,
            m.employee_id AS manager_employee_id,
-           (SELECT COUNT(*) FROM project_assignments a WHERE a.project_id = p.id) AS team_size
+           (SELECT COUNT(*) FROM project_assignments a WHERE a.project_id = p.id) AS team_size,
+           (SELECT COALESCE(json_agg(json_build_object('hours', a.hours_per_week, 'salary', u.salary)), '[]')
+            FROM project_assignments a JOIN users u ON u.id = a.user_id
+            WHERE a.project_id = p.id) AS labour
     FROM projects p
     JOIN users m ON m.id = p.manager_id
     """
@@ -59,14 +64,17 @@ def fetch_visible_project(cur: psycopg.Cursor, actor: Actor, project_id: int, lo
     return row
 
 
-def fetch_project_for_write(cur: psycopg.Cursor, request: Request, project_id: int) -> dict:
+def fetch_project_for_write(cur: psycopg.Cursor, request: Request, project_id: int, lock: bool = True) -> dict:
     """
-    Load and lock a project the caller is about to change.
+    Load (and by default lock) a project the caller is about to change.
 
     Missing projects are 404. A manager acting on someone else's project is
     denied with 403 *and audited*, so admins can see attempted interference.
     """
-    cur.execute(SELECT_PROJECT + sql.SQL(" WHERE p.id = %s FOR UPDATE OF p"), (project_id,))
+    query = SELECT_PROJECT + sql.SQL(" WHERE p.id = %s")
+    if lock:
+        query += sql.SQL(" FOR UPDATE OF p")
+    cur.execute(query, (project_id,))
     row = cur.fetchone()
     if row is None:
         raise NotFound("Project not found")
@@ -78,9 +86,44 @@ def fetch_project_for_write(cur: psycopg.Cursor, request: Request, project_id: i
     return row
 
 
+def labour_summary(row: dict) -> tuple[Decimal, Decimal]:
+    """Return ``(allocated hours per week, projected labour cost)`` for a project row."""
+    hours = Decimal(0)
+    cost = Decimal(0)
+    for item in row["labour"]:
+        item_hours = Decimal(str(item["hours"]))
+        hours += item_hours
+        cost += budget.assignment_cost(
+            item_hours, Decimal(str(item["salary"])), row["start_date"], row["predicted_end_date"]
+        )
+    return hours, cost
+
+
+def attach_my_hours(cur: psycopg.Cursor, actor: Actor, rows: list[dict]) -> None:
+    """Add the viewer's own ``hours_per_week`` on each project (shown on employees' lists)."""
+    if not rows:
+        return
+    cur.execute(
+        "SELECT project_id, hours_per_week FROM project_assignments WHERE user_id = %s AND project_id = ANY(%s)",
+        (actor.id, [row["id"] for row in rows]),
+    )
+    mine = {r["project_id"]: r["hours_per_week"] for r in cur.fetchall()}
+    for row in rows:
+        row["my_hours_per_week"] = mine.get(row["id"])
+
+
 def serialize(row: dict, viewer: Actor) -> dict:
-    """Public representation of a project. Budgets are hidden from employees."""
+    """Public representation of a project. Budget and cost figures are hidden from employees."""
+    allocated_hours, cost = labour_summary(row)
+    show_money = viewer.role != "employee"
     return {
+        **({
+            "projected_cost": cost,
+            "remaining_budget": row["budget"] - cost,
+            "over_budget": cost > row["budget"],
+        } if show_money else {}),
+        "allocated_hours": allocated_hours,
+        "my_hours_per_week": row.get("my_hours_per_week"),
         "id": row["id"],
         "name": row["name"],
         "description": row["description"],
@@ -91,7 +134,7 @@ def serialize(row: dict, viewer: Actor) -> dict:
         "manager_id": row["manager_id"],
         "manager_name": row["manager_name"],
         "manager_employee_id": row["manager_employee_id"],
-        "budget": row["budget"] if viewer.role != "employee" else None,
+        "budget": row["budget"] if show_money else None,
         "status": row["status"],
         "is_archived": row["is_archived"],
         "archived_at": row["archived_at"],

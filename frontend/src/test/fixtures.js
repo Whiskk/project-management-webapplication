@@ -18,7 +18,45 @@ export function makeProject(overrides = {}) {
     is_archived: false,
     archived_at: null,
     team_size: 2,
+    allocated_hours: 20,
+    projected_cost: 3000,
+    remaining_budget: 47000,
+    over_budget: false,
+    my_hours_per_week: null,
     created_at: '2026-10-13T10:00:00Z',
+    ...overrides,
+  };
+}
+
+/** A team member as returned by GET /projects/{id}/assignments. */
+export function makeAssignment(overrides = {}) {
+  return {
+    id: 31,
+    user_id: TEST_USERS.employee.id,
+    employee_id: 'EMP001',
+    first_name: 'Eli',
+    last_name: 'Employee',
+    job_title: 'Software Engineer',
+    hours_per_week: 10,
+    total_hours: 20,
+    cost: 1000,
+    ...overrides,
+  };
+}
+
+/** An entry from GET /projects/{id}/staffing-options ($50/hour over a two-week project). */
+export function makeStaffingOption(overrides = {}) {
+  return {
+    user_id: TEST_USERS.employee.id,
+    employee_id: 'EMP001',
+    first_name: 'Eli',
+    last_name: 'Employee',
+    job_title: 'Software Engineer',
+    assignment_id: null,
+    assigned_hours: null,
+    committed_hours_elsewhere: 25,
+    available_hours: 15,
+    cost_per_weekly_hour: 100,
     ...overrides,
   };
 }

@@ -11,6 +11,7 @@ import ProjectDetailPage from './ProjectDetailPage';
 
 function renderAs(role, project = makeProject()) {
   vi.spyOn(projectsApi, 'get').mockResolvedValue(project);
+  vi.spyOn(projectsApi, 'team').mockResolvedValue({ items: [] });
   return renderWithProviders(
     <Routes>
       <Route path="/projects/:projectId" element={<ProjectDetailPage />} />
@@ -26,6 +27,7 @@ describe('ProjectDetailPage', () => {
     expect(screen.getByText('Managed by Morgan Manager (MGR001)')).toBeInTheDocument();
     expect(screen.getByText('80 h')).toBeInTheDocument();
     expect(screen.getByText('$50,000')).toBeInTheDocument();
+    expect(screen.getByText('$3,000 projected labour · $47,000 left')).toBeInTheDocument();
     expect(screen.getByText('Customer portal rebuild')).toBeInTheDocument();
     expect(projectsApi.get).toHaveBeenCalledWith('7', expect.anything());
   });
@@ -54,12 +56,21 @@ describe('ProjectDetailPage', () => {
     expect(screen.queryByRole('button', { name: 'Archive' })).not.toBeInTheDocument();
   });
 
-  it('is read-only for employees and hides the budget', async () => {
-    renderAs('employee', makeProject({ budget: null }));
+  it('is read-only for employees and shows their hours instead of the budget', async () => {
+    renderAs('employee', makeProject({
+      budget: null, projected_cost: undefined, remaining_budget: undefined, over_budget: undefined, my_hours_per_week: 10,
+    }));
     await screen.findByRole('heading', { name: 'Apollo' });
     expect(screen.queryByRole('button', { name: 'Edit' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Assign' })).not.toBeInTheDocument();
     expect(screen.queryByText('Budget')).not.toBeInTheDocument();
-    expect(screen.getByText('people assigned')).toBeInTheDocument();
+    expect(screen.getByText('Your hours')).toBeInTheDocument();
+    expect(screen.getByText('10 h')).toBeInTheDocument();
+  });
+
+  it('flags over-budget projects', async () => {
+    renderAs('manager', makeProject({ projected_cost: 52000, remaining_budget: -2000, over_budget: true }));
+    expect(await screen.findByText('Over budget')).toBeInTheDocument();
   });
 
   it('archives after confirmation and reloads', async () => {

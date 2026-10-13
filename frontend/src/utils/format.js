@@ -16,6 +16,11 @@ export function formatDate(value) {
   return value ? dateFormatter.format(new Date(`${value.slice(0, 10)}T00:00:00Z`)) : '—';
 }
 
+/** Format hours without trailing zeros: 7.5 -> "7.5 h", 40 -> "40 h". */
+export function formatHours(value) {
+  return value === null || value === undefined ? '—' : `${Number(value).toLocaleString('en-US', { maximumFractionDigits: 1 })} h`;
+}
+
 /** "First Last" for a user-like object. */
 export function fullName(user) {
   return user ? `${user.first_name} ${user.last_name}` : '';

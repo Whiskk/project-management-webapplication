@@ -21,8 +21,10 @@ from pm_core.db import transaction
 from pm_core.errors import Conflict, ValidationError
 from pm_core.http import Request, Response, Router, created, ok
 from pm_core.validation import Field, parse_choice, parse_id, parse_pagination, validate
+import staffing
 from project_queries import (
     SELECT_PROJECT,
+    attach_my_hours,
     audit_view,
     fetch_project_for_write,
     fetch_visible_project,
@@ -100,6 +102,7 @@ def register(router: Router) -> None:
                 [*params, limit, offset],
             )
             rows = cur.fetchall()
+            attach_my_hours(cur, request.actor, rows)
         return ok({"items": [serialize(r, request.actor) for r in rows], "total": total})
 
     @router.post("/")
@@ -139,6 +142,7 @@ def register(router: Router) -> None:
         """View a project the caller may see."""
         with transaction() as cur:
             row = fetch_visible_project(cur, request.actor, parse_id(request.params["id"]))
+            attach_my_hours(cur, request.actor, [row])
         return ok(serialize(row, request.actor))
 
     @router.patch("/{id}")
@@ -158,6 +162,7 @@ def register(router: Router) -> None:
             )
             if "manager_id" in data and data["manager_id"] != before["manager_id"]:
                 check_manager(cur, data["manager_id"])
+            staffing.check_project_change(cur, before, {**before, **data})
             after = _apply_update(cur, actor, before, data)
             changes = audit.diff(audit_view(before), audit_view(after))
             if changes:
@@ -208,6 +213,8 @@ def register(router: Router) -> None:
                     "The project's manager is no longer active. Choose a new manager to reactivate it.",
                     details={"manager_id": "Must be an active manager"},
                 ) from None
+            # Its team's hours count again once it is current, so re-check the 40-hour rule.
+            staffing.check_project_change(cur, before, {**before, "is_archived": False})
             cur.execute(
                 """
                 UPDATE projects SET is_archived = FALSE, archived_at = NULL, manager_id = %s, updated_at = now()
