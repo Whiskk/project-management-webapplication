@@ -43,8 +43,27 @@ def test_demo_users_are_seeded_with_hashed_passwords(fresh_db: None) -> None:
     ]
     assert rows[2]["manager"] == "MGR001"
     for row, demo in zip(rows, schema.DEMO_USERS, strict=True):
-        assert demo["password"] not in row["password_hash"]
-        assert passwords.verify_password(demo["password"], row["password_hash"])
+        assert demo["local_password"] not in row["password_hash"]
+        assert passwords.verify_password(demo["local_password"], row["password_hash"])
+
+
+def test_cloud_seed_uses_random_passwords_logged_once(
+    fresh_db: None, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    monkeypatch.setattr(schema.config, "is_local", lambda: False)
+    with db.transaction() as cur:
+        cur.execute("DELETE FROM users")
+        schema._seed_demo_users(cur)
+        cur.execute("SELECT employee_id, password_hash FROM users ORDER BY id")
+        rows = cur.fetchall()
+
+    [message] = [r.getMessage() for r in caplog.records if "one-time passwords" in r.getMessage()]
+    for row, demo in zip(rows, schema.DEMO_USERS, strict=True):
+        # The documented local password must never work in the cloud...
+        assert not passwords.verify_password(demo["local_password"], row["password_hash"])
+        # ...but the logged one-time password does.
+        logged = message.split(f"{row['employee_id']}=")[1][:6]
+        assert passwords.verify_password(logged, row["password_hash"])
 
 
 def test_email_uniqueness_is_case_insensitive(fresh_db: None) -> None:

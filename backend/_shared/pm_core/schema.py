@@ -11,7 +11,7 @@ import logging
 
 import psycopg
 
-from pm_core import passwords
+from pm_core import config, passwords
 
 logger = logging.getLogger(__name__)
 
@@ -157,23 +157,30 @@ MIGRATIONS: list[tuple[int, str]] = [
     ),
 ]
 
-# Demo accounts created on an empty database. Documented in the README so the
-# app can be demoed immediately; change these passwords before real use.
+# Demo accounts created on an empty database.
+#
+# ``local_password`` values are documented in the README and are ONLY used
+# when IS_LOCAL is true (LocalStack). In the cloud every demo account gets a
+# random password instead, logged once to the Lambda's private CloudWatch log,
+# so the public source code never contains a usable cloud credential.
 DEMO_USERS: list[dict] = [
     {
         "employee_id": "ADM001", "first_name": "Alex", "last_name": "Admin",
         "email": "alex.admin@example.com", "job_title": "Administrator",
-        "salary": 120000, "role": "admin", "password": "Admin1",
+        "salary": 120000, "role": "admin",
+        "local_password": "Admin1",  # nosec B105 - local-only demo credential (see above)
     },
     {
         "employee_id": "MGR001", "first_name": "Morgan", "last_name": "Manager",
         "email": "morgan.manager@example.com", "job_title": "Engineering Manager",
-        "salary": 110000, "role": "manager", "password": "Mngr01",
+        "salary": 110000, "role": "manager",
+        "local_password": "Mngr01",  # nosec B105 - local-only demo credential (see above)
     },
     {
         "employee_id": "EMP001", "first_name": "Eli", "last_name": "Employee",
         "email": "eli.employee@example.com", "job_title": "Software Engineer",
-        "salary": 90000, "role": "employee", "password": "Empl01",
+        "salary": 90000, "role": "employee",
+        "local_password": "Empl01",  # nosec B105 - local-only demo credential (see above)
         "manager_employee_id": "MGR001",
     },
 ]
@@ -198,14 +205,25 @@ def ensure_schema(conn: psycopg.Connection) -> None:
 
 
 def _seed_demo_users(cur: psycopg.Cursor) -> None:
-    """Insert the demo accounts if the users table is empty."""
+    """
+    Insert the demo accounts if the users table is empty.
+
+    Locally the documented demo passwords are used. In the cloud each account
+    gets a random password, logged once so the deployer can sign in as the
+    admin and reset the others from the Users page.
+    """
     cur.execute("SELECT EXISTS (SELECT 1 FROM users) AS has_users")
     if cur.fetchone()["has_users"]:
         return
-    logger.info("Seeding demo users")
+    local = config.is_local()
+    logger.info("Seeding demo users (%s passwords)", "documented local" if local else "random")
     ids: dict[str, int] = {}
+    generated: dict[str, str] = {}
     for user in DEMO_USERS:
         manager_id = ids.get(user.get("manager_employee_id", ""))
+        password = user["local_password"] if local else passwords.generate_password()
+        if not local:
+            generated[user["employee_id"]] = password
         cur.execute(
             """
             INSERT INTO users (employee_id, first_name, last_name, email, job_title,
@@ -216,7 +234,14 @@ def _seed_demo_users(cur: psycopg.Cursor) -> None:
             (
                 user["employee_id"], user["first_name"], user["last_name"], user["email"],
                 user["job_title"], user["salary"], user["role"], manager_id,
-                passwords.hash_password(user["password"]),
+                passwords.hash_password(password),
             ),
         )
         ids[user["employee_id"]] = cur.fetchone()["id"]
+    if generated:
+        # Logged exactly once (seeding only happens on an empty database) to the
+        # Lambda's CloudWatch log, which is private to the AWS account.
+        logger.warning(
+            "Demo accounts created with one-time passwords - sign in as ADM001 and reset the others: %s",
+            ", ".join(f"{employee_id}={password}" for employee_id, password in generated.items()),
+        )

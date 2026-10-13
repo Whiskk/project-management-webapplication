@@ -21,7 +21,7 @@ def call(method: str, path: str, body: object = None, headers: dict | None = Non
 
 def login(employee_id: str, password: str | None = None) -> tuple[int, dict]:
     """Attempt a login with a demo user's password (or the given one)."""
-    password = password if password is not None else demo_user(employee_id)["password"]
+    password = password if password is not None else demo_user(employee_id)["local_password"]
     return call("POST", "/login", {"employee_id": employee_id, "password": password})
 
 
@@ -44,7 +44,7 @@ def test_login_returns_tokens_and_user(fresh_db: None) -> None:
 
 
 def test_login_is_case_insensitive_on_employee_id(fresh_db: None) -> None:
-    assert login("adm001", demo_user("ADM001")["password"])[0] == 200
+    assert login("adm001", demo_user("ADM001")["local_password"])[0] == 200
 
 
 def test_successful_login_is_audited(fresh_db: None) -> None:
