@@ -4,15 +4,19 @@ Projects service.
 Route modules register themselves on one shared router so the service stays
 organised by sub-domain as it grows:
 
+    approval_routes    - cross-team hours approval (registered first: /approvals
+                         must not be captured by the /{id} route)
     project_routes     - project CRUD, archive / reactivate
     assignment_routes  - staffing with the 40-hour and budget rules
 """
 
+import approval_routes
 import assignment_routes
 import project_routes
 from pm_core.http import Router
 
 router = Router("projects")
+approval_routes.register(router)
 project_routes.register(router)
 assignment_routes.register(router)
 

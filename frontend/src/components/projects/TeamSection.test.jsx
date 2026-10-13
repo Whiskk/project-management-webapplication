@@ -102,6 +102,38 @@ describe('TeamSection', () => {
     expect(projectsApi.updateAssignment).toHaveBeenCalledWith(PROJECT.id, 31, { hours_per_week: 8 });
   });
 
+  it('labels hours that are waiting for the employee\'s manager', async () => {
+    projectsApi.team.mockResolvedValue({
+      items: [
+        makeAssignment({
+          status: 'pending', hours_per_week: null, pending_hours: 12, reserved_hours: 12, awaiting_approval: true,
+          requested_by_name: 'Pat Projectlead',
+        }),
+        makeAssignment({
+          id: 32, user_id: 9, first_name: 'Nia', last_name: 'Newhire', hours_per_week: 10, pending_hours: 15,
+          reserved_hours: 15, awaiting_approval: true, requested_by_name: 'Pat Projectlead',
+        }),
+      ],
+    });
+    renderTeam();
+    expect(await screen.findByText('12 h')).toBeInTheDocument();
+    expect(screen.getByText('10 h → 15 h')).toBeInTheDocument();
+    expect(screen.getAllByText('Awaiting Morgan Manager')).toHaveLength(2);
+  });
+
+  it('explains when new hours need another manager\'s approval', async () => {
+    projectsApi.staffingOptions.mockResolvedValue({ items: [makeStaffingOption({ needs_approval: true })] });
+    vi.spyOn(projectsApi, 'assign').mockResolvedValue(
+      makeAssignment({ status: 'pending', awaiting_approval: true, approver_name: 'Morgan Manager' }),
+    );
+    renderTeam();
+    const dialog = await openAssignDialog();
+    expect(within(dialog).getByText(/reports to Morgan Manager, so these hours need their approval/)).toBeInTheDocument();
+    await userEvent.type(within(dialog).getByLabelText(/Hours per week/), '5');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Request approval' }));
+    expect(await screen.findByText('Request sent to Morgan Manager for approval')).toBeInTheDocument();
+  });
+
   it('removes a member after confirmation', async () => {
     vi.spyOn(projectsApi, 'removeAssignment').mockResolvedValue(null);
     const onChanged = renderTeam();

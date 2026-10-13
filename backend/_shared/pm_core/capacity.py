@@ -81,7 +81,8 @@ def other_loads(cur: psycopg.Cursor, user_id: int, exclude_project_id: int) -> l
     cur.execute(
         sql.SQL(
             """
-            SELECT p.start_date, p.predicted_end_date, a.hours_per_week
+            -- Reserved hours: a pending increase counts at its requested figure.
+            SELECT p.start_date, p.predicted_end_date, COALESCE(a.pending_hours, a.hours_per_week) AS hours_per_week
             FROM project_assignments a JOIN projects p ON p.id = a.project_id
             WHERE a.user_id = %s AND a.project_id <> %s AND {}
             """

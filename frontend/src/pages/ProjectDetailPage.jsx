@@ -170,7 +170,15 @@ export default function ProjectDetailPage() {
         <Grid size={{ xs: 12, sm: 6, md: 3 }}>
           {showMoney
             ? <BudgetStat project={data} />
-            : <Stat label="Your hours" value={formatHours(data.my_hours_per_week)} hint={`per week · team of ${data.team_size}`} />}
+            : (
+              <Stat
+                label="Your hours"
+                value={formatHours(data.my_hours_per_week ?? 0)}
+                hint={data.my_pending_hours !== null
+                  ? `per week · ${formatHours(data.my_pending_hours)} awaiting your manager's approval`
+                  : `per week · team of ${data.team_size}`}
+              />
+            )}
         </Grid>
       </Grid>
 

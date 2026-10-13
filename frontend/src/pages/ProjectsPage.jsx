@@ -179,7 +179,18 @@ export default function ProjectsPage() {
                         {project.over_budget && <Chip size="small" color="error" label="Over budget" sx={{ ml: 1 }} />}
                       </TableCell>
                     ) : (
-                      <TableCell align="right">{formatHours(project.my_hours_per_week)}</TableCell>
+                      <TableCell align="right">
+                        {project.my_hours_per_week !== null && formatHours(project.my_hours_per_week)}
+                        {project.my_pending_hours !== null && (
+                          <Chip
+                            size="small"
+                            color="warning"
+                            variant="outlined"
+                            label={`${formatHours(project.my_pending_hours)} pending approval`}
+                            sx={{ ml: project.my_hours_per_week !== null ? 1 : 0 }}
+                          />
+                        )}
+                      </TableCell>
                     )}
                   </TableRow>
                 ))}

@@ -39,7 +39,8 @@ export default function AssignmentDialog({ project, assignment, onClose, onSaved
   const options = useApiResource(fetchOptions);
 
   const [selectedId, setSelectedId] = useState(assignment?.user_id ?? null);
-  const [hours, setHours] = useState(assignment ? String(assignment.hours_per_week) : '');
+  // Edits start from the reserved figure (what the budget and 40-hour rule currently count).
+  const [hours, setHours] = useState(assignment ? String(assignment.reserved_hours) : '');
   const [error, setError] = useState(null);
   const [fieldError, setFieldError] = useState(null);
   const [saving, setSaving] = useState(false);
@@ -49,7 +50,11 @@ export default function AssignmentDialog({ project, assignment, onClose, onSaved
   const selected = allOptions.find((option) => option.user_id === selectedId) ?? null;
 
   const newHours = Number(hours) || 0;
-  const oldHours = assignment ? Number(assignment.hours_per_week) : 0;
+  const oldHours = assignment ? Number(assignment.reserved_hours) : 0;
+  const confirmedHours = assignment?.hours_per_week ?? 0;
+  // Someone else's report: new hours, or more than the confirmed hours, wait for their manager.
+  const needsApproval = Boolean(selected?.needs_approval)
+    && (!editing || assignment.status === 'pending' || newHours > Number(confirmedHours));
   const delta = newHours - oldHours;
   const addedCost = selected ? delta * selected.cost_per_weekly_hour : 0;
   const costAfter = Number(project.projected_cost) + addedCost;
@@ -67,12 +72,10 @@ export default function AssignmentDialog({ project, assignment, onClose, onSaved
     setError(null);
     setFieldError(null);
     try {
-      if (editing) {
-        await projectsApi.updateAssignment(project.id, assignment.id, { hours_per_week: newHours });
-      } else {
-        await projectsApi.assign(project.id, { user_id: selected.user_id, hours_per_week: newHours });
-      }
-      onSaved(selected);
+      const result = editing
+        ? await projectsApi.updateAssignment(project.id, assignment.id, { hours_per_week: newHours })
+        : await projectsApi.assign(project.id, { user_id: selected.user_id, hours_per_week: newHours });
+      onSaved(selected, result);
     } catch (apiError) {
       setFieldError(fieldErrorsFrom(apiError).hours_per_week ?? apiError.details?.hours_per_week ?? null);
       setError(apiError.message);
@@ -130,6 +133,12 @@ export default function AssignmentDialog({ project, assignment, onClose, onSaved
               slotProps={{ htmlInput: { min: 0.5, max: MAX_HOURS, step: 0.5 } }}
               disabled={saving || !selected}
             />
+            {needsApproval && (
+              <Alert severity="info">
+                {fullName(selected)} reports to {selected.manager_name}, so these hours need their approval.
+                They are held for this project until {selected.manager_name} decides.
+              </Alert>
+            )}
             {selected && hours !== '' && !invalidHours && (
               <Box
                 sx={{
@@ -164,7 +173,7 @@ export default function AssignmentDialog({ project, assignment, onClose, onSaved
         <DialogActions>
           <Button onClick={onClose} disabled={saving}>Cancel</Button>
           <Button type="submit" variant="contained" disabled={!canSave}>
-            {saving ? 'Saving…' : editing ? 'Save hours' : 'Assign'}
+            {saving ? 'Saving…' : needsApproval ? 'Request approval' : editing ? 'Save hours' : 'Assign'}
           </Button>
         </DialogActions>
       </form>

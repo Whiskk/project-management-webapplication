@@ -208,6 +208,15 @@ def test_manager_denied_for_non_reports_is_audited_despite_rollback(fresh_db: No
         assert cur.fetchone()["first_name"] == "Alex"
 
 
+def test_manager_editing_own_record_is_denied_without_hanging(fresh_db: None) -> None:
+    # Regression: the target row was locked FOR UPDATE, which blocked the audit
+    # insert's foreign-key check on the same (actor's) row - a silent deadlock.
+    status, _ = call("PATCH", f"/{user_id('MGR001')}", "MGR001", {"first_name": "Self"})
+    assert status == 403
+    entry = last_audit()
+    assert (entry["outcome"], entry["actor_employee_id"]) == ("denied", "MGR001")
+
+
 def test_admin_changes_salary_and_manager(fresh_db: None) -> None:
     _, created = call("POST", "/", "ADM001", {**NEW_EMPLOYEE, "email": "m2@example.com", "role": "manager"})
     new_manager = created["user"]["id"]

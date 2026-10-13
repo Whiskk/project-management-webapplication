@@ -8,6 +8,7 @@ transaction is rolled back.
 """
 
 import json
+import logging
 from dataclasses import dataclass
 from datetime import date, datetime
 from decimal import Decimal
@@ -17,6 +18,7 @@ import psycopg
 
 from pm_core import db
 
+logger = logging.getLogger(__name__)
 # Fields never written to the audit log.
 _HIDDEN_FIELDS = {"password_hash", "password"}
 # Fields whose change is recorded, but not their values.
@@ -133,8 +135,13 @@ def record_denied(
     Record a denied attempt on its own connection, so it is kept even if it
     happens inside a request transaction that is about to roll back.
     """
-    with db.independent_transaction() as cur:
-        record(
-            cur, actor, action, entity_type, entity_id, summary,
-            project_id=project_id, outcome="denied", actor_employee_id=actor_employee_id,
-        )
+    try:
+        with db.independent_transaction() as cur:
+            record(
+                cur, actor, action, entity_type, entity_id, summary,
+                project_id=project_id, outcome="denied", actor_employee_id=actor_employee_id,
+            )
+    except psycopg.Error:
+        # The request is still refused; losing this one audit entry must not
+        # turn a 403 into a 500 or a hang. The log line keeps a record of it.
+        logger.exception("Could not audit denied attempt: %s", summary)

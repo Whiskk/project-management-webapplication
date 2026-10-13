@@ -12,6 +12,7 @@ export const ROLE_LABELS = {
 };
 
 const PERMISSIONS = {
+  'approvals.review': ['manager'],
   'audit.view': ['admin'],
   'users.view': ['admin', 'manager'],
   'users.manage': ['admin'],

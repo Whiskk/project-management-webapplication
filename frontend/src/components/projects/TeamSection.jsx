@@ -3,6 +3,7 @@ import Alert from '@mui/material/Alert';
 import Button from '@mui/material/Button';
 import Card from '@mui/material/Card';
 import CardContent from '@mui/material/CardContent';
+import Chip from '@mui/material/Chip';
 import IconButton from '@mui/material/IconButton';
 import Skeleton from '@mui/material/Skeleton';
 import Stack from '@mui/material/Stack';
@@ -25,6 +26,20 @@ import { useNotify } from '../feedback/notificationContext';
 import AssignmentDialog from './AssignmentDialog';
 
 const DESKTOP_ONLY = { display: { xs: 'none', sm: 'table-cell' } };
+
+/** Confirmed hours, plus any hours waiting for the employee's manager to approve. */
+function HoursCell({ member }) {
+  if (!member.awaiting_approval) return formatHours(member.hours_per_week);
+  const isNew = member.hours_per_week === null;
+  return (
+    <Stack alignItems="flex-end" spacing={0.5}>
+      <span>{isNew ? formatHours(member.pending_hours) : `${formatHours(member.hours_per_week)} → ${formatHours(member.pending_hours)}`}</span>
+      <Tooltip title={`Requested by ${member.requested_by_name}. Hours are held until ${member.approver_name} decides.`}>
+        <Chip size="small" color="warning" variant="outlined" label={`Awaiting ${member.approver_name}`} />
+      </Tooltip>
+    </Stack>
+  );
+}
 
 /**
  * The project's team. Admins and the project's manager can assign people,
@@ -109,7 +124,9 @@ export default function TeamSection({ project, canStaff, showCosts, onChanged })
                       <Typography variant="body2" fontWeight={600}>{fullName(member)}</Typography>
                       <Typography variant="caption" color="text.secondary">{member.job_title || member.employee_id}</Typography>
                     </TableCell>
-                    <TableCell align="right">{formatHours(member.hours_per_week)}</TableCell>
+                    <TableCell align="right">
+                      <HoursCell member={member} />
+                    </TableCell>
                     <TableCell align="right" sx={DESKTOP_ONLY}>{formatHours(member.total_hours)}</TableCell>
                     {showCosts && <TableCell align="right">{formatCurrency(member.cost)}</TableCell>}
                     {canStaff && (
@@ -139,8 +156,12 @@ export default function TeamSection({ project, canStaff, showCosts, onChanged })
           project={project}
           assignment={editing.assignment}
           onClose={() => setEditing(null)}
-          onSaved={(employee) => {
-            notify(editing.assignment ? 'Hours updated' : `${fullName(employee)} assigned to ${project.name}`, 'success');
+          onSaved={(employee, result) => {
+            if (result.awaiting_approval) {
+              notify(`Request sent to ${result.approver_name} for approval`, 'info');
+            } else {
+              notify(editing.assignment ? 'Hours updated' : `${fullName(employee)} assigned to ${project.name}`, 'success');
+            }
             setEditing(null);
             refresh();
           }}

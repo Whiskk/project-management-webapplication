@@ -25,7 +25,8 @@ SELECT_PROJECT = sql.SQL(
            m.first_name || ' ' || m.last_name AS manager_name,
            m.employee_id AS manager_employee_id,
            (SELECT COUNT(*) FROM project_assignments a WHERE a.project_id = p.id) AS team_size,
-           (SELECT COALESCE(json_agg(json_build_object('hours', a.hours_per_week, 'salary', u.salary)), '[]')
+           (SELECT COALESCE(json_agg(json_build_object(
+                       'hours', COALESCE(a.pending_hours, a.hours_per_week), 'salary', u.salary)), '[]')
             FROM project_assignments a JOIN users u ON u.id = a.user_id
             WHERE a.project_id = p.id) AS labour
     FROM projects p
@@ -56,7 +57,7 @@ def fetch_visible_project(cur: psycopg.Cursor, actor: Actor, project_id: int, lo
     if condition is not None:
         query += sql.SQL(" AND ") + condition
     if lock:
-        query += sql.SQL(" FOR UPDATE OF p")
+        query += sql.SQL(" FOR NO KEY UPDATE OF p")
     cur.execute(query, [project_id, *params])
     row = cur.fetchone()
     if row is None:
@@ -73,7 +74,7 @@ def fetch_project_for_write(cur: psycopg.Cursor, request: Request, project_id: i
     """
     query = SELECT_PROJECT + sql.SQL(" WHERE p.id = %s")
     if lock:
-        query += sql.SQL(" FOR UPDATE OF p")
+        query += sql.SQL(" FOR NO KEY UPDATE OF p")
     cur.execute(query, (project_id,))
     row = cur.fetchone()
     if row is None:
@@ -104,12 +105,23 @@ def attach_my_hours(cur: psycopg.Cursor, actor: Actor, rows: list[dict]) -> None
     if not rows:
         return
     cur.execute(
-        "SELECT project_id, hours_per_week FROM project_assignments WHERE user_id = %s AND project_id = ANY(%s)",
+        "SELECT project_id, hours_per_week, status, pending_hours FROM project_assignments "
+        "WHERE user_id = %s AND project_id = ANY(%s)",
         (actor.id, [row["id"] for row in rows]),
     )
-    mine = {r["project_id"]: r["hours_per_week"] for r in cur.fetchall()}
+    mine = {r["project_id"]: r for r in cur.fetchall()}
     for row in rows:
-        row["my_hours_per_week"] = mine.get(row["id"])
+        assignment = mine.get(row["id"])
+        row["my_assignment"] = assignment
+
+
+def _my_assignment_fields(assignment: dict | None) -> dict:
+    """The viewer's own confirmed hours and any hours awaiting approval."""
+    if assignment is None:
+        return {"my_hours_per_week": None, "my_pending_hours": None}
+    if assignment["status"] == "pending":
+        return {"my_hours_per_week": None, "my_pending_hours": assignment["hours_per_week"]}
+    return {"my_hours_per_week": assignment["hours_per_week"], "my_pending_hours": assignment["pending_hours"]}
 
 
 def serialize(row: dict, viewer: Actor) -> dict:
@@ -123,7 +135,7 @@ def serialize(row: dict, viewer: Actor) -> dict:
             "over_budget": cost > row["budget"],
         } if show_money else {}),
         "allocated_hours": allocated_hours,
-        "my_hours_per_week": row.get("my_hours_per_week"),
+        **_my_assignment_fields(row.get("my_assignment")),
         "id": row["id"],
         "name": row["name"],
         "description": row["description"],

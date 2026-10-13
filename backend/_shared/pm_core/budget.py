@@ -54,7 +54,8 @@ def projected_cost(
     overrides = dict(overrides or {})
     cur.execute(
         """
-        SELECT a.user_id, a.hours_per_week, u.salary
+        -- Reserved hours: pending requests count against the budget until rejected.
+        SELECT a.user_id, COALESCE(a.pending_hours, a.hours_per_week) AS hours_per_week, u.salary
         FROM project_assignments a JOIN users u ON u.id = a.user_id
         WHERE a.project_id = %s
         """,

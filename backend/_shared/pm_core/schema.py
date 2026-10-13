@@ -155,6 +155,28 @@ MIGRATIONS: list[tuple[int, str]] = [
             FOR EACH STATEMENT EXECUTE FUNCTION audit_log_immutable();
         """,
     ),
+    (
+        2,
+        # Cross-team hours approval. A new pending assignment holds its requested
+        # hours in hours_per_week; a pending *increase* on an approved assignment
+        # keeps the approved hours and holds the requested figure in pending_hours.
+        # Reserved hours (counted for the 40-hour and budget rules) are
+        # COALESCE(pending_hours, hours_per_week).
+        """
+        ALTER TABLE project_assignments
+            ADD COLUMN status        VARCHAR(10) NOT NULL DEFAULT 'approved'
+                                     CHECK (status IN ('approved', 'pending')),
+            ADD COLUMN pending_hours NUMERIC(4, 1)
+                                     CHECK (pending_hours IS NULL OR (pending_hours > 0 AND pending_hours <= 40)),
+            ADD COLUMN requested_by  BIGINT REFERENCES users (id),
+            ADD COLUMN requested_at  TIMESTAMPTZ,
+            ADD CONSTRAINT pending_assignment_has_no_pending_increase
+                CHECK (status = 'approved' OR pending_hours IS NULL);
+
+        CREATE INDEX project_assignments_awaiting_idx ON project_assignments (user_id)
+            WHERE status = 'pending' OR pending_hours IS NOT NULL;
+        """,
+    ),
 ]
 
 # Demo accounts created on an empty database.

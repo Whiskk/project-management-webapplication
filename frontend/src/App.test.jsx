@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import App from './App';
 import { api } from './services/api';
+import { projectsApi } from './services/projectsApi';
 import { fakeAuth, renderWithProviders, TEST_USERS } from './test/render';
 
 const healthy = () => vi.spyOn(api, 'get').mockResolvedValue({ status: 'ok', database: 'ok', schema_version: 1 });
@@ -26,6 +27,24 @@ describe('App routing and layout', () => {
     renderWithProviders(<App />, { auth: fakeAuth({ user: TEST_USERS.manager }) });
     expect(screen.getByText('Welcome back, Morgan. You are signed in as Manager.')).toBeInTheDocument();
     await screen.findByText('API online');
+  });
+
+  it('shows managers an Approvals link with a pending count', async () => {
+    healthy();
+    vi.spyOn(projectsApi, 'approvals').mockResolvedValue({ items: [], total: 2 });
+    renderWithProviders(<App />, { auth: fakeAuth({ user: TEST_USERS.manager }) });
+    await userEvent.click(screen.getByRole('button', { name: 'Open navigation' }));
+    expect(screen.getByRole('link', { name: /Approvals/ })).toBeInTheDocument();
+    expect(await screen.findByLabelText('2 awaiting approval')).toBeInTheDocument();
+  });
+
+  it('does not show Approvals to admins or employees', async () => {
+    healthy();
+    const approvals = vi.spyOn(projectsApi, 'approvals');
+    renderWithProviders(<App />, { auth: fakeAuth({ user: TEST_USERS.employee }) });
+    await userEvent.click(screen.getByRole('button', { name: 'Open navigation' }));
+    expect(screen.queryByRole('link', { name: /Approvals/ })).not.toBeInTheDocument();
+    expect(approvals).not.toHaveBeenCalled();
   });
 
   it('signs out from the account menu', async () => {

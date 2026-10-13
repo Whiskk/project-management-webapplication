@@ -90,7 +90,7 @@ def _fetch_user(cur: psycopg.Cursor, user_id: int, lock: bool = False) -> dict:
     """Load a user (with manager name) or raise 404."""
     query = _SELECT_USER + sql.SQL(" WHERE u.id = %s")
     if lock:
-        query += sql.SQL(" FOR UPDATE OF u")
+        query += sql.SQL(" FOR NO KEY UPDATE OF u")
     cur.execute(query, (user_id,))
     row = cur.fetchone()
     if row is None:

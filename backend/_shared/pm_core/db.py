@@ -73,6 +73,10 @@ def independent_transaction() -> Iterator[psycopg.Cursor]:
 
     Used for writes that must commit even when the surrounding request's
     transaction rolls back (e.g. auditing a denied attempt mid-transaction).
+
+    A lock timeout guarantees this can never wait forever on a row lock held by
+    the request's own (still open) transaction - Postgres cannot detect that
+    kind of deadlock because the other side of the wait is in Python.
     """
     get_connection()  # ensure the schema exists
     with (
@@ -80,4 +84,5 @@ def independent_transaction() -> Iterator[psycopg.Cursor]:
         conn.transaction(),
         conn.cursor() as cur,
     ):
+        cur.execute("SET LOCAL lock_timeout = '5s'")
         yield cur

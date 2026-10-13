@@ -13,4 +13,7 @@ export const projectsApi = {
   assign: (id, data) => api.post('projects', `/${id}/assignments`, data),
   updateAssignment: (id, assignmentId, data) => api.patch('projects', `/${id}/assignments/${assignmentId}`, data),
   removeAssignment: (id, assignmentId) => api.delete('projects', `/${id}/assignments/${assignmentId}`),
+  approvals: (signal) => api.get('projects', '/approvals', { signal }),
+  approve: (id, assignmentId) => api.post('projects', `/${id}/assignments/${assignmentId}/approve`),
+  reject: (id, assignmentId, note) => api.post('projects', `/${id}/assignments/${assignmentId}/reject`, note ? { note } : {}),
 };

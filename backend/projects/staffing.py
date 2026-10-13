@@ -2,7 +2,7 @@
 Staffing rules shared by assignment routes and project edits.
 
 Every check runs inside the caller's transaction after the project row (and
-the affected user rows) are locked with ``SELECT ... FOR UPDATE``, so two
+the affected user rows) are locked with ``SELECT ... FOR NO KEY UPDATE``, so two
 concurrent requests cannot both pass a check and together break the rule.
 Locks are always taken project-first, then users in id order, to avoid deadlocks.
 """
@@ -18,13 +18,17 @@ def lock_users(cur: psycopg.Cursor, user_ids: list[int]) -> dict[int, dict]:
     """Lock user rows (in id order) and return them by id."""
     if not user_ids:
         return {}
-    cur.execute("SELECT * FROM users WHERE id = ANY(%s) ORDER BY id FOR UPDATE", (sorted(set(user_ids)),))
+    cur.execute("SELECT * FROM users WHERE id = ANY(%s) ORDER BY id FOR NO KEY UPDATE", (sorted(set(user_ids)),))
     return {row["id"]: row for row in cur.fetchall()}
 
 
 def team(cur: psycopg.Cursor, project_id: int) -> list[dict]:
-    """The project's assignments (user id and hours)."""
-    cur.execute("SELECT user_id, hours_per_week FROM project_assignments WHERE project_id = %s", (project_id,))
+    """The project's assignments with their reserved hours (pending requests included)."""
+    cur.execute(
+        "SELECT user_id, COALESCE(pending_hours, hours_per_week) AS hours_per_week "
+        "FROM project_assignments WHERE project_id = %s",
+        (project_id,),
+    )
     return cur.fetchall()
 
 

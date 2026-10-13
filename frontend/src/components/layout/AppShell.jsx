@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { NavLink, Outlet } from 'react-router';
+import { NavLink, Outlet, useLocation } from 'react-router';
 import { useMediaQuery } from 'react-responsive';
 import AppBar from '@mui/material/AppBar';
+import Badge from '@mui/material/Badge';
 import Box from '@mui/material/Box';
 import Drawer from '@mui/material/Drawer';
 import IconButton from '@mui/material/IconButton';
@@ -12,12 +13,14 @@ import ListItemText from '@mui/material/ListItemText';
 import Toolbar from '@mui/material/Toolbar';
 import Typography from '@mui/material/Typography';
 import AccountCircleIcon from '@mui/icons-material/AccountCircle';
+import AssignmentTurnedInIcon from '@mui/icons-material/AssignmentTurnedIn';
 import DashboardIcon from '@mui/icons-material/Dashboard';
 import FolderIcon from '@mui/icons-material/Folder';
 import MenuIcon from '@mui/icons-material/Menu';
 import PeopleIcon from '@mui/icons-material/People';
 import { useAuth } from '../../auth/authContext';
 import { can } from '../../auth/permissions';
+import { useApprovalCount } from '../../services/approvalCount';
 import UserMenu from './UserMenu';
 
 const DRAWER_WIDTH = 240;
@@ -26,6 +29,7 @@ const DRAWER_WIDTH = 240;
 const NAV_ITEMS = [
   { to: '/', label: 'Dashboard', icon: <DashboardIcon /> },
   { to: '/projects', label: 'Projects', icon: <FolderIcon /> },
+  { to: '/approvals', label: 'Approvals', icon: <AssignmentTurnedInIcon />, permission: 'approvals.review', badge: 'approvals' },
   { to: '/users', label: 'Users', icon: <PeopleIcon />, permission: 'users.view' },
   { to: '/profile', label: 'My profile', icon: <AccountCircleIcon /> },
 ];
@@ -33,6 +37,9 @@ const NAV_ITEMS = [
 /** Responsive app layout: permanent sidebar on desktop, slide-out drawer on mobile. */
 export default function AppShell() {
   const { user } = useAuth();
+  const location = useLocation();
+  // Refreshed on every navigation so the badge stays current without polling.
+  const approvalCount = useApprovalCount(can(user, 'approvals.review'), location.key);
   const isDesktop = useMediaQuery({ minWidth: 900 });
   const [mobileOpen, setMobileOpen] = useState(false);
   const visibleItems = NAV_ITEMS.filter((item) => !item.permission || can(user, item.permission));
@@ -50,7 +57,13 @@ export default function AppShell() {
             onClick={() => setMobileOpen(false)}
             sx={{ '&.active': { bgcolor: 'action.selected', fontWeight: 600 } }}
           >
-            <ListItemIcon>{item.icon}</ListItemIcon>
+            <ListItemIcon>
+              {item.badge === 'approvals' ? (
+                <Badge badgeContent={approvalCount} color="error" aria-label={`${approvalCount} awaiting approval`}>
+                  {item.icon}
+                </Badge>
+              ) : item.icon}
+            </ListItemIcon>
             <ListItemText primary={item.label} />
           </ListItemButton>
         ))}
