@@ -1,4 +1,4 @@
-import { Navigate, Outlet, useLocation } from 'react-router';
+import { Navigate, Outlet } from 'react-router';
 import Box from '@mui/material/Box';
 import CircularProgress from '@mui/material/CircularProgress';
 import { useAuth } from './authContext';
@@ -6,7 +6,6 @@ import { useAuth } from './authContext';
 /** Route wrapper: renders child routes only for signed-in users. */
 export default function RequireAuth() {
   const { status } = useAuth();
-  const location = useLocation();
 
   if (status === 'initializing') {
     return (
@@ -16,7 +15,7 @@ export default function RequireAuth() {
     );
   }
   if (status === 'anonymous') {
-    return <Navigate to="/login" replace state={{ from: location }} />;
+    return <Navigate to="/login" replace />;
   }
   return <Outlet />;
 }

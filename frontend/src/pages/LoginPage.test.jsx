@@ -29,14 +29,17 @@ describe('LoginPage', () => {
     expect(auth.login).not.toHaveBeenCalled();
   });
 
-  it('signs in and returns to the page the user originally requested', async () => {
+  it('always lands on the dashboard, never the previous user\'s page', async () => {
+    // Regression: an admin signed out on an admin-only page, then an employee
+    // signed in and was sent to that page (showing an access error).
     const auth = anonymous({ login: vi.fn().mockResolvedValue({}) });
     renderLogin(auth, { pathname: '/login', state: { from: { pathname: '/projects' } } });
     await userEvent.type(screen.getByLabelText(/Employee ID/), ' emp001 ');
     await userEvent.type(screen.getByLabelText(/Password/), 'Empl01');
     await userEvent.click(screen.getByRole('button', { name: 'Sign in' }));
     expect(auth.login).toHaveBeenCalledWith('emp001', 'Empl01');
-    expect(await screen.findByText('Projects page')).toBeInTheDocument();
+    expect(await screen.findByText('Dashboard page')).toBeInTheDocument();
+    expect(screen.queryByText('Projects page')).not.toBeInTheDocument();
   });
 
   it('shows the server error and re-enables the form on failure', async () => {

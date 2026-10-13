@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Navigate, useLocation, useNavigate } from 'react-router';
+import { Navigate, useNavigate } from 'react-router';
 import Alert from '@mui/material/Alert';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
@@ -21,14 +21,14 @@ function validate({ employeeId, password }) {
 export default function LoginPage() {
   const { status, login } = useAuth();
   const navigate = useNavigate();
-  const location = useLocation();
   const [values, setValues] = useState({ employeeId: '', password: '' });
   const [fieldErrors, setFieldErrors] = useState({});
   const [submitError, setSubmitError] = useState(null);
   const [submitting, setSubmitting] = useState(false);
 
-  const redirectTo = location.state?.from?.pathname || '/';
-  if (status === 'authenticated') return <Navigate to={redirectTo} replace />;
+  // Always land on the dashboard: the previous page may belong to a different
+  // user (e.g. an admin-only page from before sign-out) that this user cannot see.
+  if (status === 'authenticated') return <Navigate to="/" replace />;
 
   const handleChange = (field) => (event) => {
     setValues((current) => ({ ...current, [field]: event.target.value }));
@@ -45,7 +45,7 @@ export default function LoginPage() {
     setSubmitError(null);
     try {
       await login(values.employeeId.trim(), values.password);
-      navigate(redirectTo, { replace: true });
+      navigate('/', { replace: true });
     } catch (error) {
       setSubmitError(error.message);
       setSubmitting(false);
