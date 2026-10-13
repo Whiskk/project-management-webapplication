@@ -13,22 +13,27 @@ import Toolbar from '@mui/material/Toolbar';
 import Typography from '@mui/material/Typography';
 import DashboardIcon from '@mui/icons-material/Dashboard';
 import MenuIcon from '@mui/icons-material/Menu';
+import { useAuth } from '../../auth/authContext';
+import { can } from '../../auth/permissions';
+import UserMenu from './UserMenu';
 
 const DRAWER_WIDTH = 240;
 
-// Navigation entries; later slices add role-restricted items here.
+// Navigation entries. Items with a `permission` are only shown to roles that have it.
 const NAV_ITEMS = [{ to: '/', label: 'Dashboard', icon: <DashboardIcon /> }];
 
 /** Responsive app layout: permanent sidebar on desktop, slide-out drawer on mobile. */
 export default function AppShell() {
+  const { user } = useAuth();
   const isDesktop = useMediaQuery({ minWidth: 900 });
   const [mobileOpen, setMobileOpen] = useState(false);
+  const visibleItems = NAV_ITEMS.filter((item) => !item.permission || can(user, item.permission));
 
   const navigation = (
     <Box component="nav" aria-label="Main navigation">
       <Toolbar />
       <List>
-        {NAV_ITEMS.map((item) => (
+        {visibleItems.map((item) => (
           <ListItemButton
             key={item.to}
             component={NavLink}
@@ -54,9 +59,10 @@ export default function AppShell() {
               <MenuIcon />
             </IconButton>
           )}
-          <Typography variant="h6" component="span" noWrap>
+          <Typography variant="h6" component="span" noWrap sx={{ flexGrow: 1 }}>
             Project Hub
           </Typography>
+          <UserMenu compact={!isDesktop} />
         </Toolbar>
       </AppBar>
 

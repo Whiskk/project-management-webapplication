@@ -3,7 +3,9 @@
  *
  * Every request goes to `${VITE_API_URL}/api/<service><path>`: the local CORS
  * proxy (port 3001) in development, CloudFront in AWS. All failures are
- * normalised into `ApiError` so UI code handles one error shape.
+ * normalised into `ApiError` so UI code handles one error shape. When an
+ * access token has expired the request is transparently retried once after
+ * refreshing the session.
  */
 
 const API_URL = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '');
@@ -18,11 +20,23 @@ export class ApiError extends Error {
   }
 }
 
-let tokenProvider = () => null;
+const noAuth = {
+  getAccessToken: () => null,
+  refresh: null,
+  onAuthFailure: () => {},
+};
+let authHandlers = noAuth;
 
-/** Register a function that returns the current access token (set by auth). */
-export function setTokenProvider(provider) {
-  tokenProvider = provider;
+/**
+ * Connect the client to the session layer.
+ *
+ * @param {object} handlers
+ * @param {() => string|null} handlers.getAccessToken - Current access token.
+ * @param {() => Promise<void>} handlers.refresh - Refresh the session (throws on failure).
+ * @param {() => void} handlers.onAuthFailure - Called when the session can no longer be used.
+ */
+export function configureAuth(handlers) {
+  authHandlers = { ...noAuth, ...handlers };
 }
 
 function buildUrl(service, path, query) {
@@ -45,10 +59,11 @@ function buildUrl(service, path, query) {
  * @returns {Promise<any>} Parsed JSON body, or null for 204 responses.
  * @throws {ApiError}
  */
-export async function apiRequest(service, path = '', { method = 'GET', body, query, signal } = {}) {
+export async function apiRequest(service, path = '', options = {}) {
+  const { method = 'GET', body, query, signal, retried = false } = options;
   const headers = { Accept: 'application/json' };
   if (body !== undefined) headers['Content-Type'] = 'application/json';
-  const token = tokenProvider();
+  const token = authHandlers.getAccessToken();
   if (token) headers.Authorization = `Bearer ${token}`;
 
   let response;
@@ -78,16 +93,22 @@ export async function apiRequest(service, path = '', { method = 'GET', body, que
   }
 
   const data = await response.json();
-  if (!response.ok) {
-    const error = data?.error || {};
-    throw new ApiError(
-      response.status,
-      error.code || 'error',
-      error.message || 'Request failed.',
-      error.details,
-    );
+  if (response.ok) return data;
+
+  const error = data?.error || {};
+  if (response.status === 401 && token) {
+    if (error.code === 'token_expired' && !retried && authHandlers.refresh) {
+      try {
+        await authHandlers.refresh();
+      } catch {
+        authHandlers.onAuthFailure();
+        throw new ApiError(401, 'session_expired', 'Your session has expired. Please sign in again.');
+      }
+      return apiRequest(service, path, { ...options, retried: true });
+    }
+    authHandlers.onAuthFailure();
   }
-  return data;
+  throw new ApiError(response.status, error.code || 'error', error.message || 'Request failed.', error.details);
 }
 
 export const api = {

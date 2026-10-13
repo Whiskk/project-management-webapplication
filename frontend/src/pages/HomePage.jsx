@@ -7,17 +7,27 @@ import Chip from '@mui/material/Chip';
 import Skeleton from '@mui/material/Skeleton';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
+import { useAuth } from '../auth/authContext';
+import { ROLE_LABELS } from '../auth/permissions';
 import useApiResource from '../hooks/useApiResource';
 import { api } from '../services/api';
 
 /** Landing page. Shows backend/database connectivity until role dashboards land. */
 export default function HomePage() {
+  const { user } = useAuth();
   const fetchHealth = useCallback((signal) => api.get('health', '', { signal }), []);
   const health = useApiResource(fetchHealth);
 
   return (
     <Stack spacing={3}>
-      <Typography variant="h1">Dashboard</Typography>
+      <div>
+        <Typography variant="h1">Dashboard</Typography>
+        {user && (
+          <Typography color="text.secondary">
+            Welcome back, {user.first_name}. You are signed in as {ROLE_LABELS[user.role]}.
+          </Typography>
+        )}
+      </div>
       <Card sx={{ maxWidth: 480 }}>
         <CardContent>
           <Typography variant="h3" component="h2" gutterBottom>

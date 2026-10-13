@@ -31,7 +31,7 @@ sys.path.insert(0, str(BACKEND_DIR / "_shared"))
 
 import psycopg  # noqa: E402
 
-from pm_core import config, db  # noqa: E402
+from pm_core import auth, config, db  # noqa: E402
 
 
 def _admin_conninfo() -> str:
@@ -53,12 +53,29 @@ def test_database() -> str:
 def fresh_db(test_database: str):
     """Reset the test database to an empty, freshly migrated and seeded state."""
     db.reset()
+    auth.reset_secret_cache()
     with psycopg.connect(config.postgres_conninfo(), autocommit=True) as conn:
         conn.execute("DROP SCHEMA public CASCADE")
         conn.execute("CREATE SCHEMA public")
     db.get_connection()
     yield
     db.reset()
+    auth.reset_secret_cache()
+
+
+def demo_user(employee_id: str) -> dict:
+    """Return the seeded demo user definition for an employee id."""
+    from pm_core.schema import DEMO_USERS
+
+    return next(u for u in DEMO_USERS if u["employee_id"] == employee_id)
+
+
+def bearer(employee_id: str) -> dict:
+    """Return an Authorization header with a fresh access token for a demo user."""
+    with db.transaction() as cur:
+        cur.execute("SELECT * FROM users WHERE employee_id = %s", (employee_id,))
+        actor = auth.actor_from_row(cur.fetchone())
+    return {"authorization": f"Bearer {auth.issue_token(actor, 'access')}"}
 
 
 def load_service(name: str) -> ModuleType:
