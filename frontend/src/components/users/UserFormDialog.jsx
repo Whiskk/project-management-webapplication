@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useState } from 'react';
 import Alert from '@mui/material/Alert';
 import Button from '@mui/material/Button';
 import Dialog from '@mui/material/Dialog';
@@ -11,9 +11,9 @@ import MenuItem from '@mui/material/MenuItem';
 import TextField from '@mui/material/TextField';
 import { useMediaQuery } from 'react-responsive';
 import { ROLE_LABELS } from '../../auth/permissions';
-import useApiResource from '../../hooks/useApiResource';
 import { usersApi } from '../../services/usersApi';
 import { fieldErrorsFrom, fullName } from '../../utils/format';
+import ManagerSelect from './ManagerSelect';
 
 const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 const EMPTY = { first_name: '', last_name: '', email: '', job_title: '', role: 'employee', salary: '', manager_id: '' };
@@ -73,12 +73,6 @@ export default function UserFormDialog({ open, user, editorRole, onClose, onSave
   const [errors, setErrors] = useState({});
   const [submitError, setSubmitError] = useState(null);
   const [saving, setSaving] = useState(false);
-
-  const fetchManagers = useCallback(
-    (signal) => (isAdmin ? usersApi.list({ role: 'manager', page_size: 100 }, signal) : Promise.resolve({ items: [] })),
-    [isAdmin],
-  );
-  const managers = useApiResource(fetchManagers);
 
   const setField = (field) => (event) => {
     setValues((current) => ({ ...current, [field]: event.target.value }));
@@ -159,19 +153,12 @@ export default function UserFormDialog({ open, user, editorRole, onClose, onSave
                 </Grid>
                 {values.role === 'employee' && (
                   <Grid size={12}>
-                    <TextField
-                      select
-                      label="Manager"
-                      required
-                      {...fieldProps('manager_id')}
-                      helperText={errors.manager_id || (managers.status === 'error' ? 'Could not load managers' : undefined)}
-                    >
-                      {(managers.data?.items ?? []).map((manager) => (
-                        <MenuItem key={manager.id} value={manager.id}>
-                          {fullName(manager)} ({manager.employee_id})
-                        </MenuItem>
-                      ))}
-                    </TextField>
+                    <ManagerSelect
+                      value={values.manager_id}
+                      onChange={setField('manager_id')}
+                      error={errors.manager_id}
+                      disabled={saving}
+                    />
                   </Grid>
                 )}
               </>

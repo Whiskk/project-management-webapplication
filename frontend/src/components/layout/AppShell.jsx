@@ -13,6 +13,7 @@ import Toolbar from '@mui/material/Toolbar';
 import Typography from '@mui/material/Typography';
 import AccountCircleIcon from '@mui/icons-material/AccountCircle';
 import DashboardIcon from '@mui/icons-material/Dashboard';
+import FolderIcon from '@mui/icons-material/Folder';
 import MenuIcon from '@mui/icons-material/Menu';
 import PeopleIcon from '@mui/icons-material/People';
 import { useAuth } from '../../auth/authContext';
@@ -24,6 +25,7 @@ const DRAWER_WIDTH = 240;
 // Navigation entries. Items with a `permission` are only shown to roles that have it.
 const NAV_ITEMS = [
   { to: '/', label: 'Dashboard', icon: <DashboardIcon /> },
+  { to: '/projects', label: 'Projects', icon: <FolderIcon /> },
   { to: '/users', label: 'Users', icon: <PeopleIcon />, permission: 'users.view' },
   { to: '/profile', label: 'My profile', icon: <AccountCircleIcon /> },
 ];

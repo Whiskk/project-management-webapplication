@@ -80,7 +80,11 @@ def bearer(employee_id: str) -> dict:
 
 def load_service(name: str) -> ModuleType:
     """Import ``backend/<name>/function.py`` as a uniquely named module."""
-    path = BACKEND_DIR / name / "function.py"
+    service_dir = BACKEND_DIR / name
+    # Services may split routes into sibling modules (e.g. projects/project_routes.py).
+    if str(service_dir) not in sys.path:
+        sys.path.append(str(service_dir))
+    path = service_dir / "function.py"
     spec = importlib.util.spec_from_file_location(f"service_{name}", path)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
