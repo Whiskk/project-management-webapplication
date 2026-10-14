@@ -69,6 +69,16 @@ describe('ProjectDetailPage', () => {
     expect(screen.getByText('10 h')).toBeInTheDocument();
   });
 
+  it('shows rule-based insights as alerts', async () => {
+    renderAs('manager', makeProject({ insights: [
+      { code: 'milestones_overdue', severity: 'error', message: '2 milestone(s) are overdue.' },
+      { code: 'no_team', severity: 'warning', message: 'The project is active but nobody is assigned.' },
+    ] }));
+    const insights = await screen.findByLabelText('Project insights');
+    expect(within(insights).getByText('2 milestone(s) are overdue.')).toBeInTheDocument();
+    expect(within(insights).getByText('The project is active but nobody is assigned.')).toBeInTheDocument();
+  });
+
   it('flags over-budget projects', async () => {
     renderAs('manager', makeProject({ projected_cost: 52000, remaining_budget: -2000, over_budget: true }));
     expect(await screen.findByText('Over budget')).toBeInTheDocument();

@@ -19,7 +19,7 @@ from typing import Any
 import psycopg
 from psycopg import sql
 
-from pm_core import audit, passwords
+from pm_core import audit, budget, passwords
 from pm_core.audit import Actor
 from pm_core.auth import ROLES, deny, require_auth
 from pm_core.db import transaction
@@ -321,12 +321,41 @@ def update_user(request: Request) -> Response:
         after = _apply_update(cur, before, data)
         changes = audit.diff(_audit_view(before), _audit_view(after))
         if changes:
+            over = _projects_pushed_over_budget(cur, before, after) if "salary" in changes else []
+            flag = f" - now over budget: {', '.join(over)}" if over else ""
             audit.record(
                 cur, actor, "user.update", "user", after["id"],
-                f"Updated {_full_name(after)} ({after['employee_id']}): {', '.join(changes)}",
+                f"Updated {_full_name(after)} ({after['employee_id']}): {', '.join(changes)}{flag}",
                 before=_audit_view(before), after=_audit_view(after),
             )
     return ok(serialize(after, actor))
+
+
+def _projects_pushed_over_budget(cur: psycopg.Cursor, before: dict, after: dict) -> list[str]:
+    """
+    Names of current projects this salary change pushed over budget.
+
+    Pay changes are HR decisions, so they are never blocked by a project
+    budget; instead the affected projects are named in the audit entry and
+    flagged "over budget" in the app until a manager or admin resolves them.
+    """
+    if after["salary"] <= before["salary"]:
+        return []
+    cur.execute(
+        """
+        SELECT p.id, p.name, p.budget, p.start_date, p.predicted_end_date
+        FROM projects p JOIN project_assignments a ON a.project_id = p.id
+        WHERE a.user_id = %s AND NOT p.is_archived AND p.status <> 'completed'
+        ORDER BY p.name
+        """,
+        (after["id"],),
+    )
+    return [
+        project["name"]
+        for project in cur.fetchall()
+        if budget.projected_cost(cur, project["id"], project["start_date"], project["predicted_end_date"])
+        > project["budget"]
+    ]
 
 
 def _check_admin_update(cur: psycopg.Cursor, actor: Actor, before: dict, data: dict) -> None:

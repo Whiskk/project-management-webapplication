@@ -13,7 +13,7 @@ from decimal import Decimal
 import psycopg
 from psycopg import sql
 
-from pm_core import budget, workdays
+from pm_core import budget, insights, workdays
 from pm_core.audit import Actor
 from pm_core.auth import deny
 from pm_core.errors import NotFound
@@ -28,7 +28,17 @@ SELECT_PROJECT = sql.SQL(
            (SELECT COALESCE(json_agg(json_build_object(
                        'hours', COALESCE(a.pending_hours, a.hours_per_week), 'salary', u.salary)), '[]')
             FROM project_assignments a JOIN users u ON u.id = a.user_id
-            WHERE a.project_id = p.id) AS labour
+            WHERE a.project_id = p.id) AS labour,
+           (SELECT COUNT(*) FROM milestones ms WHERE ms.project_id = p.id) AS milestones_total,
+           (SELECT COUNT(*) FROM milestones ms
+            WHERE ms.project_id = p.id AND ms.status = 'completed') AS milestones_completed,
+           (SELECT COUNT(*) FROM milestones ms
+            WHERE ms.project_id = p.id AND ms.status <> 'completed' AND ms.due_date < CURRENT_DATE) AS milestones_overdue,
+           (SELECT COUNT(*) FROM milestones ms
+            WHERE ms.project_id = p.id AND ms.due_date > p.predicted_end_date) AS milestones_past_end,
+           (SELECT COUNT(*) FROM project_assignments a
+            WHERE a.project_id = p.id AND (a.status = 'pending' OR a.pending_hours IS NOT NULL)) AS pending_hours_requests,
+           CURRENT_DATE AS today
     FROM projects p
     JOIN users m ON m.id = p.manager_id
     """
@@ -124,11 +134,36 @@ def _my_assignment_fields(assignment: dict | None) -> dict:
     return {"my_hours_per_week": assignment["hours_per_week"], "my_pending_hours": assignment["pending_hours"]}
 
 
+def project_insights(row: dict, cost: Decimal, include_money: bool) -> list[dict]:
+    """Rule-based insights for a project row (see pm_core.insights)."""
+    facts = insights.ProjectFacts(
+        status=row["status"],
+        is_archived=row["is_archived"],
+        start_date=row["start_date"],
+        predicted_end_date=row["predicted_end_date"],
+        budget=row["budget"],
+        projected_cost=cost,
+        team_size=row["team_size"],
+        pending_hours_requests=row["pending_hours_requests"],
+        milestones_total=row["milestones_total"],
+        milestones_completed=row["milestones_completed"],
+        milestones_overdue=row["milestones_overdue"],
+        milestones_past_end=row["milestones_past_end"],
+    )
+    return insights.project_insights(facts, row["today"], include_money)
+
+
 def serialize(row: dict, viewer: Actor) -> dict:
     """Public representation of a project. Budget and cost figures are hidden from employees."""
     allocated_hours, cost = labour_summary(row)
     show_money = viewer.role != "employee"
     return {
+        "insights": project_insights(row, cost, show_money),
+        "milestones": {
+            "total": row["milestones_total"],
+            "completed": row["milestones_completed"],
+            "overdue": row["milestones_overdue"],
+        },
         **({
             "projected_cost": cost,
             "remaining_budget": row["budget"] - cost,

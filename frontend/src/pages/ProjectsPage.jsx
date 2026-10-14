@@ -22,6 +22,7 @@ import SearchIcon from '@mui/icons-material/Search';
 import { useAuth } from '../auth/authContext';
 import { can } from '../auth/permissions';
 import { useNotify } from '../components/feedback/notificationContext';
+import InsightList from '../components/projects/InsightList';
 import ProjectFormDialog from '../components/projects/ProjectFormDialog';
 import ProjectStatusChip from '../components/projects/ProjectStatusChip';
 import { PROJECT_STATUSES } from '../components/projects/projectStatuses';
@@ -168,7 +169,12 @@ export default function ProjectsPage() {
                         </Typography>
                       )}
                     </TableCell>
-                    <TableCell><ProjectStatusChip project={project} /></TableCell>
+                    <TableCell>
+                      <Stack spacing={0.5} alignItems="flex-start">
+                        <ProjectStatusChip project={project} />
+                        <InsightList insights={project.insights.filter((i) => i.severity !== 'info')} max={2} />
+                      </Stack>
+                    </TableCell>
                     <TableCell sx={DESKTOP_ONLY}>{project.manager_name}</TableCell>
                     <TableCell sx={DESKTOP_ONLY}>{formatDate(project.start_date)}</TableCell>
                     <TableCell>{formatDate(project.predicted_end_date)}</TableCell>
@@ -176,7 +182,6 @@ export default function ProjectsPage() {
                     {showBudget ? (
                       <TableCell sx={DESKTOP_ONLY} align="right">
                         {formatCurrency(project.budget)}
-                        {project.over_budget && <Chip size="small" color="error" label="Over budget" sx={{ ml: 1 }} />}
                       </TableCell>
                     ) : (
                       <TableCell align="right">

@@ -24,6 +24,8 @@ export function makeProject(overrides = {}) {
     over_budget: false,
     my_hours_per_week: null,
     my_pending_hours: null,
+    insights: [],
+    milestones: { total: 0, completed: 0, overdue: 0 },
     created_at: '2026-10-13T10:00:00Z',
     ...overrides,
   };

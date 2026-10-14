@@ -19,6 +19,7 @@ import { useAuth } from '../auth/authContext';
 import { can } from '../auth/permissions';
 import ConfirmDialog from '../components/common/ConfirmDialog';
 import { useNotify } from '../components/feedback/notificationContext';
+import InsightList from '../components/projects/InsightList';
 import ProjectFormDialog from '../components/projects/ProjectFormDialog';
 import ProjectStatusChip from '../components/projects/ProjectStatusChip';
 import ReactivateProjectDialog from '../components/projects/ReactivateProjectDialog';
@@ -151,6 +152,8 @@ export default function ProjectDetailPage() {
           )}
         </Stack>
       </Stack>
+
+      <InsightList insights={data.insights} variant="alerts" />
 
       {data.is_archived && (
         <Alert severity="info">

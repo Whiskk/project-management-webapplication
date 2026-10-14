@@ -17,6 +17,7 @@ export const projectsApi = {
   createMilestone: (id, data) => api.post('projects', `/${id}/milestones`, data),
   updateMilestone: (id, milestoneId, data) => api.patch('projects', `/${id}/milestones/${milestoneId}`, data),
   deleteMilestone: (id, milestoneId) => api.delete('projects', `/${id}/milestones/${milestoneId}`),
+  dashboard: (signal) => api.get('projects', '/dashboard', { signal }),
   requests: (query, signal) => api.get('projects', '/requests', { query, signal }),
   submitRequest: (data) => api.post('projects', '/requests', data),
   withdrawRequest: (requestId) => api.post('projects', `/requests/${requestId}/withdraw`),
