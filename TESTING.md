@@ -11,7 +11,7 @@ Results below are from **14 October 2026**, against commit `a99f17d` (local) and
 | Frontend components + services | Vitest + React Testing Library | **168** | ✅ all pass | **91.5% lines**, 90.2% statements, 86.4% branches, 82.7% functions |
 | End-to-end (browser) | Playwright (Chromium desktop + Pixel 7 mobile) | **20 journeys** | ✅ all pass locally (18 also on AWS; 2 new pending deploy) | all critical user paths (below) |
 | Accessibility | axe-core in Playwright, WCAG 2.0/2.1/2.2 A and AA | **5 scans, 20+ screens** | ✅ no violations | every page for every role, key dialogs, error states, phone menu |
-| Live API smoke test | `bin/smoke-test.sh` (curl) | **75 checks** | ✅ 75/75 locally (62 earlier checks also on AWS) | every service and business rule |
+| Live API smoke test | `bin/smoke-test.sh` (curl) | **75 checks** | ✅ 75/75 **locally and on AWS** | every service and business rule |
 | Load | Artillery | 700 virtual users, 4,200 requests | ✅ 0 errors on AWS | see [Performance](#performance) |
 | Static analysis | ruff (Python), ESLint (JS), bandit (security), npm audit | - | ✅ all clean | - |
 
