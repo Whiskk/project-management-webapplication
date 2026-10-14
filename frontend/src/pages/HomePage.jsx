@@ -16,6 +16,7 @@ import Typography from '@mui/material/Typography';
 import { useAuth } from '../auth/authContext';
 import { ROLE_LABELS } from '../auth/permissions';
 import BudgetCheckButton from '../components/dashboard/BudgetCheckButton';
+import MyTasks from '../components/dashboard/MyTasks';
 import { AttentionList, CapacityBar, StatTile } from '../components/dashboard/DashboardWidgets';
 import SystemStatus from '../components/dashboard/SystemStatus';
 import useApiResource from '../hooks/useApiResource';
@@ -118,7 +119,7 @@ function ManagerDashboard({ data }) {
   );
 }
 
-function EmployeeDashboard({ data }) {
+function EmployeeDashboard({ data, onRefresh }) {
   const { stats } = data;
   return (
     <Grid container spacing={2}>
@@ -161,6 +162,9 @@ function EmployeeDashboard({ data }) {
             )}
           </CardContent>
         </Card>
+      </Grid>
+      <Grid size={12}>
+        <MyTasks tasks={data.my_tasks ?? []} onChanged={onRefresh} />
       </Grid>
       <Grid size={12}>
         <Card>

@@ -1,6 +1,6 @@
 # Project Hub
 
-A project-management web app for **Admins, Managers and Employees**: create and staff projects, plan milestones with dependencies, keep labour costs inside budgets, never overbook anyone beyond 40 hours a week, and keep a tamper-proof audit trail of everything that happens.
+A project-management web app for **Admins, Managers and Employees**: create and staff projects, plan milestones with dependencies and task checklists, keep labour costs inside budgets, never overbook anyone beyond 40 hours a week, and keep a tamper-proof audit trail of everything that happens.
 
 Built for the Citi Coding Workshop (Full Stack track) on the required stack: **React + Material UI + React Responsive → Python AWS Lambdas → PostgreSQL**, deployed to AWS with Terraform and shell scripts.
 
@@ -28,8 +28,8 @@ Built for the Citi Coding Workshop (Full Stack track) on the required stack: **R
 | Role | Can do |
 |---|---|
 | **Admin** | Create every account. **Employee IDs are generated from the person's initials plus 4 random characters** (e.g. Eli Employee → `EE3H9W`; letters and digits without look-alikes like 0/O and 1/I/L) and never change, even if the person is renamed; the 6-character password is generated and shown once, and **the person must choose their own password the first time they sign in** (the same applies after an admin resets a password). Create, edit, archive and reactivate projects and assign their manager. Approve or reject managers' project requests (approving creates the project, optionally with adjusted budget/dates/manager). See the organisation dashboard, the full **Audit log**, and each project's history. Run the budget check. |
-| **Manager** | See and run the projects they manage: schedule, budget, status, **milestones with dependencies**, and **staffing** (hours per week). Staff any employee; staffing someone else's report sends the hours to that employee's manager for **approval**. Approve or reject hours requested for their own reports. Request new projects. Edit their direct reports' basic details. See a **scoped Audit log**: their own activity and their direct reports' (never other managers' or admins'). Dashboard with their team's load this week. |
-| **Employee** | See the projects they're assigned to, their hours (and hours awaiting approval), the team and milestones - never budgets or costs. Update their own name and email. Dashboard showing their week against 40 hours and upcoming milestones. |
+| **Manager** | See and run the projects they manage: schedule, budget, status, **milestones with dependencies**, **tasks** inside each milestone assigned to team members, and **staffing** (hours per week). Staff any employee; staffing someone else's report sends the hours to that employee's manager for **approval**. Approve or reject hours requested for their own reports. Request new projects. Edit their direct reports' basic details. See a **scoped Audit log**: their own activity and their direct reports' (never other managers' or admins'). Dashboard with their team's load this week. |
+| **Employee** | See the projects they're assigned to, their hours (and hours awaiting approval), the team and milestones - never budgets or costs. **Tick off tasks assigned to them** (from the project or their dashboard). Update their own name and email. Dashboard showing their week against 40 hours, their open tasks and upcoming milestones. |
 
 Everything is responsive: a permanent sidebar on desktop, a slide-out menu and simplified tables on phones.
 
@@ -42,6 +42,7 @@ These are enforced **on the server** (the UI previews them, but the API is the g
 - **Pay rises are never blocked** by a project budget; affected projects are flagged over budget and named in the audit entry.
 - **Cross-team approval:** hours for someone else's report (requested by another manager *or* an admin) wait for that employee's own manager. Pending hours are *reserved* against both rules, so approving can never fail. Reductions apply immediately.
 - **Milestones:** start on/after the project start; can't start before their dependencies are due; can't be worked on until dependencies are completed; no circular dependencies; can't be deleted while others depend on them. A due date after the predicted end is allowed but flagged.
+- **Tasks:** a checklist inside each milestone. A task has at most one assignee, who must be an approved member of the project's team; the assignee, the project's manager or an admin can tick it off (anyone else is refused and audited). Tasks can't be ticked off while their milestone waits on unfinished dependencies; a milestone can't be completed while it has open tasks, and a completed milestone takes no new or reopened tasks. Removing someone from a project unassigns their open tasks (finished tasks keep who did them).
 - **Nothing is deleted:** projects are archived (read-only, hidden by default) and users deactivated. An employee still on current projects can't be deactivated, and a manager with reports or projects can't be demoted until they're reassigned. The last admin can't be removed.
 - **Temporary passwords are single-use in practice:** until a user with an admin-issued password chooses their own (≥ 8 characters, a letter and a number, different from the temporary one), every API call except the change-password flow is refused (403 `password_change_required`), so the step can't be bypassed. Anyone can change their password later from My profile.
 - **Audit log:** every change, sign-in, sign-out and *denied attempt* is recorded with time, who (ID, name, role), what, and a field-by-field before/after. It's written in the **same transaction** as the change and the database **rejects UPDATE/DELETE/TRUNCATE** on it. Salaries are redacted; passwords never logged. Admins see everything; managers see only their own entries, their current direct reports' and failed sign-ins against those accounts (enforced in the query, not just hidden in the UI).
@@ -91,11 +92,11 @@ After editing backend code, run `./bin/build-backend.sh` (about a second); Local
 
 ```sh
 cd backend && python3 -m venv .venv && .venv/bin/pip install -r requirements-dev.txt
-.venv/bin/pytest                      # 335 unit + integration tests (uses a separate pm_test database)
+.venv/bin/pytest                      # 372 unit + integration tests (uses a separate pm_test database)
 .venv/bin/ruff check . && .venv/bin/ruff format --check .
-cd ../frontend && npm test            # 147 component/service tests (Vitest + React Testing Library)
+cd ../frontend && npm test            # 168 component/service tests (Vitest + React Testing Library)
 npm run lint && npm run e2e           # ESLint; 18 Playwright journeys + 5 axe accessibility scans
-cd .. && ./bin/smoke-test.sh          # 62 live API checks (local by default, or pass a URL)
+cd .. && ./bin/smoke-test.sh          # 75 live API checks (local by default, or pass a URL)
 ```
 
 ## Deploying to AWS

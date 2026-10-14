@@ -32,6 +32,7 @@ from pm_core.errors import Conflict, NotFound, ValidationError
 from pm_core.http import Request, Response, Router, created, no_content, ok
 from pm_core.validation import Field, parse_id, validate
 from queries import fetch_project_for_write, fetch_visible_project
+from routes.tasks import unassign_open_tasks
 
 HOURS_FIELD = Field("decimal", min_value=Decimal("0.5"), max_value=capacity.MAX_WEEKLY_HOURS)
 CREATE_SPEC = {"user_id": Field("int", min_value=1), "hours_per_week": HOURS_FIELD}
@@ -354,7 +355,10 @@ def register(router: Router) -> None:
             cur.execute("SELECT * FROM users WHERE id = %s", (assignment["user_id"],))
             user = cur.fetchone()
             cur.execute("DELETE FROM project_assignments WHERE id = %s", (assignment["id"],))
+            unassigned = unassign_open_tasks(cur, project["id"], user["id"])
             state = " (pending request cancelled)" if assignment["status"] == "pending" else ""
+            if unassigned:
+                state += f"; unassigned from {unassigned} open task(s)"
             audit.record(
                 cur,
                 actor,

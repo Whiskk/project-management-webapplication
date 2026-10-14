@@ -94,7 +94,14 @@ def team_entries(entries: None) -> None:
         cur.execute("SELECT setval('users_id_seq', (SELECT max(id) FROM users))")
         audit.record(cur, ELI, "user.update_self", "user", 3, "Eli Employee updated their profile (email)")
         audit.record(
-            cur, ELI, "access.denied", "project", 1, "Denied POST /projects/1/milestones", outcome="denied", project_id=1
+            cur,
+            ELI,
+            "access.denied",
+            "project",
+            1,
+            "Denied POST /projects/1/milestones",
+            outcome="denied",
+            project_id=1,
         )
         audit.record(cur, OTHER_MANAGER, "project.update", "project", 1, "Olga Other updated Apollo", project_id=1)
         audit.record(cur, OTHER_EMPLOYEE, "user.update_self", "user", 5, "Owen Other updated their profile (email)")

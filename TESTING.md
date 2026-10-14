@@ -7,15 +7,15 @@ Results below are from **14 October 2026**, against commit `a99f17d` (local) and
 
 | Layer | Tool | Tests | Result | Coverage |
 |---|---|---|---|---|
-| Backend unit + integration | pytest (+ pytest-cov) against a real PostgreSQL `pm_test` database | **335** | ✅ all pass | **98%** of backend code (1,994 statements, 37 uncovered) |
-| Frontend components + services | Vitest + React Testing Library | **147** | ✅ all pass | **91.7% lines**, 90.2% statements, 85.5% branches, 82.9% functions |
-| End-to-end (browser) | Playwright (Chromium desktop + Pixel 7 mobile) | **18 journeys** | ✅ all pass **locally and on AWS** | all critical user paths (below) |
+| Backend unit + integration | pytest (+ pytest-cov) against a real PostgreSQL `pm_test` database | **372** | ✅ all pass | **98%** of backend code (2,163 statements, 37 uncovered) |
+| Frontend components + services | Vitest + React Testing Library | **168** | ✅ all pass | **91.5% lines**, 90.2% statements, 86.4% branches, 82.7% functions |
+| End-to-end (browser) | Playwright (Chromium desktop + Pixel 7 mobile) | **20 journeys** | ✅ all pass locally (18 also on AWS; 2 new pending deploy) | all critical user paths (below) |
 | Accessibility | axe-core in Playwright, WCAG 2.0/2.1/2.2 A and AA | **5 scans, 20+ screens** | ✅ no violations | every page for every role, key dialogs, error states, phone menu |
-| Live API smoke test | `bin/smoke-test.sh` (curl) | **62 checks** | ✅ 62/62 **locally and on AWS** | every service and business rule |
+| Live API smoke test | `bin/smoke-test.sh` (curl) | **75 checks** | ✅ 75/75 locally (62 earlier checks also on AWS) | every service and business rule |
 | Load | Artillery | 700 virtual users, 4,200 requests | ✅ 0 errors on AWS | see [Performance](#performance) |
 | Static analysis | ruff (Python), ESLint (JS), bandit (security), npm audit | - | ✅ all clean | - |
 
-Rubric targets (`docs/full-stack.md`): backend ≥ 80% ✅ (98%), frontend ≥ 80% ✅ (91.7% lines, 82.9% functions), API endpoints ≥ 90% ✅, error handling ≥ 90% ✅, critical paths 100% E2E ✅.
+Rubric targets (`docs/full-stack.md`): backend ≥ 80% ✅ (98%), frontend ≥ 80% ✅ (91.5% lines, 82.7% functions), API endpoints ≥ 90% ✅, error handling ≥ 90% ✅, critical paths 100% E2E ✅.
 
 ## How to run
 
@@ -62,9 +62,10 @@ Every service is tested by calling its real Lambda `handler()` with Function URL
 | Projects | Visibility per role; archive (read-only, hidden, never deleted) and reactivate; manager-only fields |
 | Staffing | 40-hour rule incl. non-overlapping projects; budget exact fit vs one cent over; dates/budget changes re-checked; reductions always allowed; **concurrency: two simultaneous requests for the last free hours - exactly one succeeds** |
 | Approvals | Cross-team requests (incl. admin-made) pending for the employee's manager only; reserved hours; approve/reject/increase/reduce; denied attempts audited |
-| Milestones | Date rules, dependency rules, cycles, start/reopen rules, delete protection, progress and overdue tracking |
+| Milestones | Date rules, dependency rules, cycles, start/reopen rules, delete protection, progress and overdue tracking; can't complete with open tasks |
+| Tasks | Assignee must be an approved team member; only the assignee, project manager or an admin can tick off (others refused and audited, outsiders 404); waiting on milestone dependencies; completed milestones take no new/reopened tasks; deleting a milestone deletes its tasks; removing someone unassigns their open tasks; archived projects read-only; tasks scoped to their project; dashboard list |
 | Requests | Submit/withdraw/approve/reject; approval creates the project in the same transaction; failed approval creates nothing |
-| Audit | Same-transaction writes, rollback leaves no entry, append-only (UPDATE/DELETE/TRUNCATE rejected by the database), redaction, filters, no write routes |
+| Audit | Managers see only their own and their direct reports' entries (other teams, managers, admins hidden; filters, counts and pagination stay in scope; reassignment moves history); same-transaction writes, rollback leaves no entry, append-only (UPDATE/DELETE/TRUNCATE rejected by the database), redaction, filters, no write routes |
 | Monitor | Flags each over-budget change once, records recovery, admin-only trigger, scheduled events can't be forged over HTTP |
 | Regressions | Cross-connection lock deadlock (denied-attempt audit vs a locked row) - fixed with `FOR NO KEY UPDATE` and a lock timeout |
 
@@ -98,11 +99,13 @@ Run in real Chromium against the running app and backend; each run creates uniqu
 | Archive and reactivate | Archived projects are read-only and hidden from the default list, found under *Archived*, and can be reactivated |
 | **Profile edit is audited** | An employee can edit only name/email → the admin sees the change in the audit log with before/after values |
 | Failed sign-ins are audited | A wrong password appears in the audit log filtered to *Denied* |
+| **Managers' scoped audit log** | A manager sees their employee's profile edit (with before/after) but not the admin creating their project |
+| **Tasks** | Manager staffs Eli, plans two dependent milestones and gives Eli a task in each → completing a milestone with an open task is refused → Eli ticks his task off from the dashboard while the dependent one stays locked → the manager sees progress, completes the milestone, and the tick is in the project history (with axe scans of the open checklists and the dashboard) |
 | Budget monitor on demand | Admin runs the budget check from the dashboard |
 | Dashboard navigation | Dashboard tiles link to the matching pages |
 | Mobile layout (Pixel 7) | Slide-out navigation |
 
-**Result:** 18/18 locally (≈2.3 min) and 18/18 against AWS.
+**Result:** 20/20 journeys locally; the 18 earlier journeys also pass against AWS (the two new ones run there after the next deploy).
 
 ### Accessibility (axe)
 
@@ -110,7 +113,7 @@ Run in real Chromium against the running app and backend; each run creates uniqu
 
 The first scan found two real issues, both fixed: sidebar links were direct children of a list (now wrapped in list items), and loading placeholders had a label but no role (now `progressbar`). Colour contrast passes in the dark theme.
 
-**Result:** 5/5, no violations; the full Playwright suite is 23/23 locally.
+**Result:** 5/5, no violations; the full Playwright suite is 25/25 locally (≈3.4 min).
 
 To watch the journeys run (e.g. for a demo), from `frontend/`: `npx playwright test --ui` (pick and replay tests step by step), or `npx playwright test --headed --project=desktop` (a real browser window).
 
@@ -140,6 +143,8 @@ Run against the deployed app after each release (the smoke test automates the AP
 - [x] Staffing beyond 40 h/week or beyond the budget is refused with a clear message
 - [x] Cross-team hours wait for the employee's manager; approve/reject behave as described
 - [x] Milestone dependency rules hold; the timeline and progress update
+- [x] Tasks: assign to a team member, tick off as the assignee, blocked by dependencies and by completed milestones
+- [x] Managers' audit log shows only their own and their direct reports' activity
 - [x] Project requests: submit, withdraw, approve (creates the project), reject (reason required)
 - [x] Audit log shows every action above, including denied attempts, with before/after values
 - [x] Deep links and refreshes work on CloudFront; works at phone width

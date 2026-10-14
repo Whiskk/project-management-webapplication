@@ -97,4 +97,33 @@ describe('HomePage dashboards', () => {
     expect(await screen.findByText('You are not assigned to any projects yet.')).toBeInTheDocument();
     expect(dashboard).toHaveBeenCalledTimes(2);
   });
+
+  it('lets employees tick off their tasks from the dashboard', async () => {
+    const dashboard = {
+      role: 'employee', stats: { hours_this_week: 20, hours_awaiting_approval: 0, capacity: 40, my_projects: 1, open_tasks: 2 },
+      projects: [], upcoming_milestones: [],
+      my_tasks: [
+        { id: 4, title: 'Write release notes', milestone_title: 'Launch', due_date: '2026-11-20', project_id: 7, project_name: 'Apollo', waiting: false },
+        { id: 5, title: 'Implement API', milestone_title: 'Build', due_date: '2026-11-27', project_id: 7, project_name: 'Apollo', waiting: true },
+      ],
+    };
+    const load = vi.spyOn(projectsApi, 'dashboard').mockResolvedValue(dashboard);
+    const complete = vi.spyOn(projectsApi, 'completeTask').mockResolvedValue({});
+    renderWithProviders(<HomePage />, { auth: fakeAuth({ user: TEST_USERS.employee }) });
+    const list = await screen.findByRole('list', { name: 'My tasks' });
+    expect(within(list).getByText('Waiting on an earlier milestone to be completed')).toBeInTheDocument();
+    expect(within(list).getByRole('checkbox', { name: 'Implement API' })).toBeDisabled();
+    await userEvent.click(within(list).getByRole('checkbox', { name: 'Write release notes' }));
+    expect(complete).toHaveBeenCalledWith(7, 4);
+    expect(await screen.findByText("Completed 'Write release notes'")).toBeInTheDocument();
+    expect(load).toHaveBeenCalledTimes(2); // reloaded after ticking
+  });
+
+  it('tells employees when they have no open tasks', async () => {
+    renderAs('employee', {
+      role: 'employee', stats: { hours_this_week: 0, hours_awaiting_approval: 0, capacity: 40, my_projects: 0, open_tasks: 0 },
+      projects: [], upcoming_milestones: [], my_tasks: [],
+    });
+    expect(await screen.findByText('You have no open tasks.')).toBeInTheDocument();
+  });
 });

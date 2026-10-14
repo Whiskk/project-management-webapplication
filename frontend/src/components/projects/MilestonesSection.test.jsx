@@ -24,6 +24,9 @@ function makeMilestone(overrides = {}) {
     can_start: true,
     overdue: false,
     past_project_end: false,
+    tasks: [],
+    tasks_total: 0,
+    tasks_done: 0,
     ...overrides,
   };
 }
@@ -132,5 +135,28 @@ describe('MilestonesSection', () => {
     projectsApi.milestones.mockResolvedValue({ items: [], summary: { total: 0, completed: 0, overdue: 0, percent_complete: 0 } });
     renderSection();
     expect(await screen.findByText(/No milestones yet\. Add the first one/)).toBeInTheDocument();
+  });
+
+  it('opens a milestone\'s task checklist from its toggle and shows task progress', async () => {
+    const task = {
+      id: 9, milestone_id: 2, title: 'Implement API', description: '', done: false, completed_at: null,
+      completed_by_name: null, can_tick: true, waiting_on: ['Design'],
+      assignee: { id: 3, name: 'Eli Employee', employee_id: 'EE3H9W' },
+    };
+    projectsApi.milestones.mockResolvedValue({
+      items: [DESIGN, { ...BUILD, tasks: [task], tasks_total: 1, tasks_done: 0 }],
+      summary: { total: 2, completed: 1, overdue: 1, percent_complete: 50, tasks_total: 1, tasks_done: 0 },
+    });
+    renderSection();
+    expect(await screen.findByText(/0 of 1 tasks done/)).toBeInTheDocument();
+    const build = screen.getByRole('listitem', { name: 'Build' });
+    const toggle = within(build).getByRole('button', { name: 'Tasks 0/1' });
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    await userEvent.click(toggle);
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    const checklist = within(build).getByRole('list', { name: 'Tasks in Build' });
+    expect(within(checklist).getByRole('checkbox', { name: 'Implement API' })).toBeDisabled(); // waiting on Design
+    await userEvent.click(toggle);
+    expect(within(build).queryByRole('list', { name: 'Tasks in Build' })).not.toBeInTheDocument();
   });
 });

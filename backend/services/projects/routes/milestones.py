@@ -15,6 +15,8 @@ Rules:
 - A milestone cannot be in progress or completed until its dependencies are
   completed, and cannot be reopened while work that depends on it has started.
 - A milestone others depend on cannot be deleted until those links are removed.
+- A milestone cannot be marked completed while any of its tasks is open.
+  Deleting a milestone deletes its tasks (see routes/tasks.py).
 """
 
 from datetime import date
@@ -24,12 +26,15 @@ import psycopg
 from psycopg import sql
 
 from pm_core import audit
+from pm_core.audit import Actor
 from pm_core.auth import require_auth
 from pm_core.db import transaction
 from pm_core.errors import Conflict, NotFound, ValidationError
 from pm_core.http import Request, Response, Router, created, no_content, ok
 from pm_core.validation import Field, parse_id, validate
 from queries import fetch_project_for_write, fetch_visible_project
+from routes.tasks import load_tasks
+from routes.tasks import serialize as serialize_task
 
 STATUSES = ("not_started", "in_progress", "completed", "blocked")
 STARTED = ("in_progress", "completed")
@@ -167,8 +172,10 @@ def _check_status(
 # --------------------------------------------------------------------------- output
 
 
-def serialize(row: dict, milestones: dict[int, dict], project: dict, today: date) -> dict:
-    """A milestone with dependency titles and tracking flags."""
+def serialize(
+    row: dict, milestones: dict[int, dict], project: dict, today: date, tasks: list[dict], actor: Actor
+) -> dict:
+    """A milestone with dependency titles, tracking flags and its task checklist."""
     blocked_by = [milestones[i]["title"] for i in row["depends_on"] if milestones[i]["status"] != "completed"]
     return {
         "id": row["id"],
@@ -186,11 +193,15 @@ def serialize(row: dict, milestones: dict[int, dict], project: dict, today: date
         "can_start": not blocked_by,
         "overdue": row["status"] != "completed" and row["due_date"] < today,
         "past_project_end": row["due_date"] > project["predicted_end_date"],
+        "tasks": [serialize_task(t, actor, project, blocked_by) for t in tasks],
+        "tasks_total": len(tasks),
+        "tasks_done": sum(1 for t in tasks if t["completed_at"] is not None),
     }
 
 
-def summary(milestones: dict[int, dict], today: date) -> dict:
-    """Progress counts for a project's milestones."""
+def summary(milestones: dict[int, dict], today: date, tasks: dict[int, list[dict]]) -> dict:
+    """Progress counts for a project's milestones and their tasks."""
+    all_tasks = [t for group in tasks.values() for t in group]
     total = len(milestones)
     completed = sum(1 for m in milestones.values() if m["status"] == "completed")
     overdue = sum(1 for m in milestones.values() if m["status"] != "completed" and m["due_date"] < today)
@@ -199,6 +210,8 @@ def summary(milestones: dict[int, dict], today: date) -> dict:
         "completed": completed,
         "overdue": overdue,
         "percent_complete": round(completed * 100 / total) if total else 0,
+        "tasks_total": len(all_tasks),
+        "tasks_done": sum(1 for t in all_tasks if t["completed_at"] is not None),
     }
 
 
@@ -234,11 +247,15 @@ def register(router: Router) -> None:
         with transaction() as cur:
             project = fetch_visible_project(cur, request.actor, parse_id(request.params["id"]))
             milestones = _load_milestones(cur, project["id"])
+            tasks = load_tasks(cur, project["id"])
             today = _today(cur)
+        actor = request.actor
         return ok(
             {
-                "items": [serialize(m, milestones, project, today) for m in milestones.values()],
-                "summary": summary(milestones, today),
+                "items": [
+                    serialize(m, milestones, project, today, tasks.get(m["id"], []), actor) for m in milestones.values()
+                ],
+                "summary": summary(milestones, today, tasks),
             }
         )
 
@@ -286,7 +303,7 @@ def register(router: Router) -> None:
                 after=_audit_view(row),
                 project_id=project["id"],
             )
-            result = serialize(row, milestones, project, _today(cur))
+            result = serialize(row, milestones, project, _today(cur), [], actor)
         return created(result)
 
     @router.patch("/{id}/milestones/{milestone_id}")
@@ -318,6 +335,17 @@ def register(router: Router) -> None:
                 milestones, milestone_id, after["title"], after["start_date"], after["due_date"], depends_on, project
             )
             _check_status(milestones, milestone_id, after["status"], depends_on, before["status"])
+            if after["status"] == "completed" and before["status"] != "completed":
+                cur.execute(
+                    "SELECT COUNT(*) AS n FROM tasks WHERE milestone_id = %s AND completed_at IS NULL", (milestone_id,)
+                )
+                open_tasks = cur.fetchone()["n"]
+                if open_tasks:
+                    raise Conflict(
+                        f"Cannot mark as completed: {open_tasks} task(s) still open. "
+                        "Tick them off or remove them first.",
+                        details={"status": "Open tasks remain"},
+                    )
 
             columns = {
                 k: data[k]
@@ -355,7 +383,8 @@ def register(router: Router) -> None:
                     after=_audit_view(row),
                     project_id=project["id"],
                 )
-            result = serialize(row, milestones, project, _today(cur))
+            tasks = load_tasks(cur, project["id"])[milestone_id]
+            result = serialize(row, milestones, project, _today(cur), tasks, actor)
         return ok(result)
 
     @router.delete("/{id}/milestones/{milestone_id}")
@@ -373,14 +402,17 @@ def register(router: Router) -> None:
             dependents = [m["title"] for m in milestones.values() if milestone_id in m["depends_on"]]
             if dependents:
                 raise Conflict(f"Cannot delete: {', '.join(dependents)} depend(s) on it. Remove those links first.")
-            cur.execute("DELETE FROM milestones WHERE id = %s", (milestone_id,))
+            cur.execute("SELECT COUNT(*) AS n FROM tasks WHERE milestone_id = %s", (milestone_id,))
+            task_count = cur.fetchone()["n"]
+            cur.execute("DELETE FROM milestones WHERE id = %s", (milestone_id,))  # its tasks go with it
+            with_tasks = f" and its {task_count} task(s)" if task_count else ""
             audit.record(
                 cur,
                 actor,
                 "milestone.delete",
                 "milestone",
                 milestone_id,
-                f"Deleted milestone '{row['title']}' from {project['name']}",
+                f"Deleted milestone '{row['title']}'{with_tasks} from {project['name']}",
                 before=_audit_view(row),
                 project_id=project["id"],
             )

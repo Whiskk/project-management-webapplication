@@ -79,7 +79,14 @@ def test_create_and_list_with_dependencies(project: int) -> None:
     assert status == 200
     assert [m["title"] for m in body["items"]] == ["Design", "Build"]
     assert body["items"][0]["dependents"] == [{"id": build["id"], "title": "Build"}]
-    assert body["summary"] == {"total": 2, "completed": 0, "overdue": 0, "percent_complete": 0}
+    assert body["summary"] == {
+        "total": 2,
+        "completed": 0,
+        "overdue": 0,
+        "percent_complete": 0,
+        "tasks_total": 0,
+        "tasks_done": 0,
+    }
     entry = last_audit()
     assert (entry["action"], entry["project_id"]) == ("milestone.create", project)
 
@@ -267,7 +274,14 @@ def test_overdue_and_progress_tracking(project: int) -> None:
     _, body = call("GET", f"/{project}/milestones")
     flags = {m["title"]: m["overdue"] for m in body["items"]}
     assert flags == {"Done": False, "Late": True}
-    assert body["summary"] == {"total": 2, "completed": 1, "overdue": 1, "percent_complete": 50}
+    assert body["summary"] == {
+        "total": 2,
+        "completed": 1,
+        "overdue": 1,
+        "percent_complete": 50,
+        "tasks_total": 0,
+        "tasks_done": 0,
+    }
     assert done["completed_at"] is not None
 
 

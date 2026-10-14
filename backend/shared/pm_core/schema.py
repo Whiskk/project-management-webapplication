@@ -253,6 +253,31 @@ MIGRATIONS: list[tuple[int, str | Callable[[psycopg.Cursor], None]]] = [
         ALTER TABLE users ADD COLUMN must_change_password BOOLEAN NOT NULL DEFAULT FALSE;
         """,
     ),
+    (
+        7,
+        # Tasks: a checklist inside each milestone. A task has at most one
+        # assignee (an approved member of the project's team) and is done when
+        # completed_at is set. project_id is stored for per-project queries.
+        # Deleting a milestone deletes its tasks (the audit log keeps a record).
+        """
+        CREATE TABLE tasks (
+            id           BIGSERIAL PRIMARY KEY,
+            milestone_id BIGINT NOT NULL REFERENCES milestones (id) ON DELETE CASCADE,
+            project_id   BIGINT NOT NULL REFERENCES projects (id),
+            title        VARCHAR(200) NOT NULL,
+            description  TEXT NOT NULL DEFAULT '',
+            assignee_id  BIGINT REFERENCES users (id),
+            completed_at TIMESTAMPTZ,
+            completed_by BIGINT REFERENCES users (id),
+            created_by   BIGINT REFERENCES users (id),
+            created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+            updated_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+            CHECK ((completed_at IS NULL) = (completed_by IS NULL))
+        );
+        CREATE INDEX tasks_milestone_idx ON tasks (milestone_id, id);
+        CREATE INDEX tasks_open_assignee_idx ON tasks (assignee_id) WHERE completed_at IS NULL;
+        """,
+    ),
 ]
 
 # Demo accounts created on an empty database.

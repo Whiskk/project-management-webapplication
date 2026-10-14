@@ -12,13 +12,14 @@ Layout:
         projects     project CRUD, archive / reactivate
         assignments  staffing with the 40-hour and budget rules
         milestones   milestones with dependencies and tracking
+        tasks        task checklists inside milestones; ticking tasks off
 """
 
 from pm_core.http import Router
-from routes import approvals, assignments, dashboard, milestones, projects, requests
+from routes import approvals, assignments, dashboard, milestones, projects, requests, tasks
 
 router = Router("projects")
-for module in (approvals, requests, dashboard, projects, assignments, milestones):
+for module in (approvals, requests, dashboard, projects, assignments, milestones, tasks):
     module.register(router)
 
 

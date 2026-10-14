@@ -134,6 +134,18 @@ check "then work can start" 200 "$(status -X PATCH -H "$M" -H "$J" -d '{"status"
 check "progress is tracked" 50 "$(curl -s -m 30 -H "$M" "$API/projects/$P1/milestones" | json 'd["summary"]["percent_complete"]')"
 check "cannot delete a milestone others depend on" 409 "$(status -X DELETE -H "$M" "$API/projects/$P1/milestones/$M1")"
 
+echo "[tasks]"
+T1=$(curl -s -m 30 -X POST -H "$M" -H "$J" -d "{\"title\":\"Smoke task\",\"assignee_id\":$EMP_ID}" "$API/projects/$P1/milestones/$M2/tasks" | json 'd["id"]')
+check "manager adds a task for Eli" yes "$([ -n "$T1" ] && echo yes || echo no)"
+check "assignee must be on the team" 400 "$(status -X POST -H "$M" -H "$J" -d '{"title":"x","assignee_id":999999}' "$API/projects/$P1/milestones/$M2/tasks")"
+check "employee cannot add tasks" 403 "$(status -X POST -H "$E" -H "$J" -d '{"title":"x"}' "$API/projects/$P1/milestones/$M2/tasks")"
+check "milestone with open tasks cannot be completed" 409 "$(status -X PATCH -H "$M" -H "$J" -d '{"status":"completed"}' "$API/projects/$P1/milestones/$M2")"
+check "task is on Eli's dashboard" True "$(curl -s -m 30 -H "$E" "$API/projects/dashboard" | json "any(t['id']==$T1 for t in d['my_tasks'])")"
+check "Eli ticks off his task" True "$(curl -s -m 30 -X POST -H "$E" "$API/projects/$P1/tasks/$T1/complete" | json 'd["done"]')"
+check "then the milestone can be completed" 200 "$(status -X PATCH -H "$M" -H "$J" -d '{"status":"completed"}' "$API/projects/$P1/milestones/$M2")"
+check "completed milestone takes no new tasks" 409 "$(status -X POST -H "$M" -H "$J" -d '{"title":"late"}' "$API/projects/$P1/milestones/$M2/tasks")"
+check "Eli's tick is in his manager's audit log" True "$(curl -s -m 30 -H "$M" "$API/audit?actor=EE3H9W&action=task.complete&project_id=$P1" | json 'd["total"] > 0')"
+
 echo "[project requests]"
 req() { curl -s -m 30 -X POST -H "$M" -H "$J" -d "{\"name\":\"$1\",\"start_date\":\"2031-04-07\",\"predicted_end_date\":\"2031-04-18\",\"budget\":5000,\"justification\":\"smoke test\"}" "$API/projects/requests" | json 'd["id"]'; }
 R1=$(req "Smoke test request (safe to ignore)")

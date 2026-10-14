@@ -154,7 +154,14 @@ const theme = createTheme({
       styleOverrides: { paper: { border: `1px solid ${surface.border}`, marginTop: 6 } },
     },
     MuiAlert: {
-      styleOverrides: { root: { borderRadius: 4, alignItems: 'center' } },
+      styleOverrides: {
+        root: { borderRadius: 4, alignItems: 'center' },
+        // Filled alerts (the pop-up notifications): deep backgrounds with white text, all above 5:1.
+        filledSuccess: { backgroundColor: GREEN_DEEP, color: '#ffffff' },
+        filledError: { backgroundColor: '#b3261e', color: '#ffffff' },
+        filledWarning: { backgroundColor: '#9a5b00', color: '#ffffff' },
+        filledInfo: { backgroundColor: '#1d5fa8', color: '#ffffff' },
+      },
     },
     MuiTooltip: {
       styleOverrides: {

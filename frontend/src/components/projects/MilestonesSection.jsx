@@ -15,12 +15,15 @@ import Typography from '@mui/material/Typography';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import EditIcon from '@mui/icons-material/Edit';
+import ExpandLessIcon from '@mui/icons-material/ExpandLess';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import useApiResource from '../../hooks/useApiResource';
 import { projectsApi } from '../../services/projectsApi';
 import { formatDate } from '../../utils/format';
 import ConfirmDialog from '../common/ConfirmDialog';
 import { useNotify } from '../feedback/notificationContext';
 import MilestoneDialog from './MilestoneDialog';
+import TaskChecklist from './TaskChecklist';
 import { MILESTONE_STATUSES } from './milestoneStatuses';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -61,6 +64,13 @@ export default function MilestonesSection({ project, canEdit, onChanged }) {
   const [editing, setEditing] = useState(null); // null | { milestone } (milestone null = add)
   const [deleting, setDeleting] = useState(null);
   const [busy, setBusy] = useState(false);
+  const [openTasks, setOpenTasks] = useState(() => new Set()); // milestone ids with the checklist shown
+  const toggleTasks = (id) => setOpenTasks((current) => {
+    const next = new Set(current);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    return next;
+  });
   // Captured once on mount so rendering stays pure (the server computes 'overdue' itself).
   const [today] = useState(() => Math.floor(Date.now() / DAY_MS));
 
@@ -103,6 +113,7 @@ export default function MilestonesSection({ project, canEdit, onChanged }) {
               <Typography variant="body2" color="text.secondary">
                 {summary.completed} of {summary.total} completed ({summary.percent_complete}%)
                 {summary.overdue > 0 && ` · ${summary.overdue} overdue`}
+                {summary.tasks_total > 0 && ` · ${summary.tasks_done} of ${summary.tasks_total} tasks done`}
               </Typography>
             )}
           </div>
@@ -159,6 +170,16 @@ export default function MilestonesSection({ project, canEdit, onChanged }) {
                     {milestone.depends_on.length > 0 && ` · after ${milestone.depends_on.map((d) => d.title).join(', ')}`}
                   </Typography>
                   <Box sx={{ mt: 0.5 }}><MilestoneFlags milestone={milestone} /></Box>
+                  <Button
+                    size="small"
+                    onClick={() => toggleTasks(milestone.id)}
+                    aria-expanded={openTasks.has(milestone.id)}
+                    aria-controls={`milestone-${milestone.id}-tasks`}
+                    endIcon={openTasks.has(milestone.id) ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+                    sx={{ mt: 0.5, ml: -0.75, px: 0.75 }}
+                  >
+                    {milestone.tasks_total ? `Tasks ${milestone.tasks_done}/${milestone.tasks_total}` : 'Tasks'}
+                  </Button>
                 </div>
 
                 {isWide && (
@@ -203,6 +224,12 @@ export default function MilestonesSection({ project, canEdit, onChanged }) {
                     </Tooltip>
                   </Stack>
                 ) : <span />}
+
+                {openTasks.has(milestone.id) && (
+                  <Box id={`milestone-${milestone.id}-tasks`} sx={{ gridColumn: '1 / -1' }}>
+                    <TaskChecklist project={project} milestone={milestone} canEdit={canEdit} onChanged={refresh} />
+                  </Box>
+                )}
               </Box>
             ))}
           </Stack>
@@ -232,7 +259,9 @@ export default function MilestonesSection({ project, canEdit, onChanged }) {
       <ConfirmDialog
         open={Boolean(deleting)}
         title="Delete milestone?"
-        message={deleting ? `'${deleting.title}' will be removed from ${project.name}. The audit log keeps a record.` : ''}
+        message={deleting
+          ? `'${deleting.title}' will be removed from ${project.name}${deleting.tasks_total ? `, with its ${deleting.tasks_total} task(s)` : ''}. The audit log keeps a record.`
+          : ''}
         confirmLabel="Delete"
         confirmColor="error"
         busy={busy}

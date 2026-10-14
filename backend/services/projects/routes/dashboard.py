@@ -5,7 +5,7 @@ Role dashboards (under /api/projects/dashboard).
 
     admin     organisation totals, budget committed, projects needing attention
     manager   my projects needing attention, decisions waiting for me, my team's load this week
-    employee  my hours this week, my projects, upcoming milestones
+    employee  my hours this week, my projects, upcoming milestones, my open tasks
 
 Must be registered before routes matching ``/{id}``.
 """
@@ -168,6 +168,24 @@ def _employee(cur: psycopg.Cursor, actor: Actor) -> dict:
         """,
         (actor.id,),
     )
+    upcoming = cur.fetchall()
+    # Open tasks assigned to me, soonest milestone first. "waiting" = the milestone
+    # still depends on unfinished work, so the task cannot be ticked off yet.
+    cur.execute(
+        """
+        SELECT t.id, t.title, ms.id AS milestone_id, ms.title AS milestone_title, ms.due_date,
+               p.id AS project_id, p.name AS project_name,
+               EXISTS (SELECT 1 FROM milestone_dependencies d JOIN milestones up ON up.id = d.depends_on_id
+                       WHERE d.milestone_id = ms.id AND up.status <> 'completed') AS waiting
+        FROM tasks t
+        JOIN milestones ms ON ms.id = t.milestone_id
+        JOIN projects p ON p.id = t.project_id
+        WHERE t.assignee_id = %s AND t.completed_at IS NULL AND NOT p.is_archived
+        ORDER BY ms.due_date, t.id
+        """,
+        (actor.id,),
+    )
+    my_tasks = cur.fetchall()
     return {
         "role": "employee",
         "stats": {
@@ -175,9 +193,11 @@ def _employee(cur: psycopg.Cursor, actor: Actor) -> dict:
             "hours_awaiting_approval": week["awaiting"],
             "capacity": MAX_WEEKLY_HOURS,
             "my_projects": len(live),
+            "open_tasks": len(my_tasks),
         },
         "projects": [_summary(p) for p in live],
-        "upcoming_milestones": cur.fetchall(),
+        "upcoming_milestones": upcoming,
+        "my_tasks": my_tasks,
     }
 
 
