@@ -50,7 +50,9 @@ def test_migration_converts_old_style_ids_and_audits_it(fresh_db: None) -> None:
             "VALUES ('MGR002', 'Pat', 'Other', 'pat@example.com', 'manager', %s)",
             (passwords.hash_password("Pat123", 1000),),
         )
-        cur.execute("DELETE FROM schema_version WHERE version = 5")
+        # Rewind to just before migration 5 (later migrations are re-applied too).
+        cur.execute("ALTER TABLE users DROP COLUMN must_change_password")
+        cur.execute("DELETE FROM schema_version WHERE version >= 5")
     db.reset()
     db.get_connection()  # re-runs pending migrations
 

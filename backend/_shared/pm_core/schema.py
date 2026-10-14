@@ -245,6 +245,14 @@ MIGRATIONS: list[tuple[int, str | Callable[[psycopg.Cursor], None]]] = [
     ),
     # Employee IDs become initials + 4 random characters (see pm_core.identity).
     (5, _convert_employee_ids),
+    (
+        6,
+        # Accounts created (or passwords reset) by an admin must choose their own
+        # password at first sign-in. Existing accounts are left as they are.
+        """
+        ALTER TABLE users ADD COLUMN must_change_password BOOLEAN NOT NULL DEFAULT FALSE;
+        """,
+    ),
 ]
 
 # Demo accounts created on an empty database.

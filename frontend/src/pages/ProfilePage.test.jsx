@@ -1,6 +1,7 @@
 import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
+import { api } from '../services/api';
 import { usersApi } from '../services/usersApi';
 import { fakeAuth, renderWithProviders, TEST_USERS } from '../test/render';
 import ProfilePage from './ProfilePage';
@@ -39,5 +40,16 @@ describe('ProfilePage', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Save changes' }));
     expect(screen.getByText('Enter a valid email address')).toBeInTheDocument();
     expect(updateMe).not.toHaveBeenCalled();
+  });
+
+  it('lets any user change their password', async () => {
+    const post = vi.spyOn(api, 'post').mockResolvedValue({ ...TEST_USERS.employee });
+    renderWithProviders(<ProfilePage />, { auth: fakeAuth({ user: TEST_USERS.employee, updateUser: vi.fn() }) });
+    await userEvent.type(screen.getByLabelText(/^Current password/), 'Empl01');
+    await userEvent.type(screen.getByLabelText(/^New password/), 'Brighter9day');
+    await userEvent.type(screen.getByLabelText(/Confirm new password/), 'Brighter9day');
+    await userEvent.click(screen.getByRole('button', { name: 'Change password' }));
+    expect(post).toHaveBeenCalledWith('auth', '/change-password', { current_password: 'Empl01', new_password: 'Brighter9day' });
+    expect(await screen.findByText('Password changed')).toBeInTheDocument();
   });
 });

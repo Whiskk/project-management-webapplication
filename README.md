@@ -27,7 +27,7 @@ Built for the Citi Coding Workshop (Full Stack track) on the required stack: **R
 
 | Role | Can do |
 |---|---|
-| **Admin** | Create every account. **Employee IDs are generated from the person's initials plus 4 random characters** (e.g. Eli Employee → `EE3H9W`; letters and digits without look-alikes like 0/O and 1/I/L) and never change, even if the person is renamed; the 6-character password is generated and shown once. Create, edit, archive and reactivate projects and assign their manager. Approve or reject managers' project requests (approving creates the project, optionally with adjusted budget/dates/manager). See the organisation dashboard, the full **Audit log**, and each project's history. Run the budget check. |
+| **Admin** | Create every account. **Employee IDs are generated from the person's initials plus 4 random characters** (e.g. Eli Employee → `EE3H9W`; letters and digits without look-alikes like 0/O and 1/I/L) and never change, even if the person is renamed; the 6-character password is generated and shown once, and **the person must choose their own password the first time they sign in** (the same applies after an admin resets a password). Create, edit, archive and reactivate projects and assign their manager. Approve or reject managers' project requests (approving creates the project, optionally with adjusted budget/dates/manager). See the organisation dashboard, the full **Audit log**, and each project's history. Run the budget check. |
 | **Manager** | See and run the projects they manage: schedule, budget, status, **milestones with dependencies**, and **staffing** (hours per week). Staff any employee; staffing someone else's report sends the hours to that employee's manager for **approval**. Approve or reject hours requested for their own reports. Request new projects. Edit their direct reports' basic details. Dashboard with their team's load this week. |
 | **Employee** | See the projects they're assigned to, their hours (and hours awaiting approval), the team and milestones - never budgets or costs. Update their own name and email. Dashboard showing their week against 40 hours and upcoming milestones. |
 
@@ -43,6 +43,7 @@ These are enforced **on the server** (the UI previews them, but the API is the g
 - **Cross-team approval:** hours for someone else's report (requested by another manager *or* an admin) wait for that employee's own manager. Pending hours are *reserved* against both rules, so approving can never fail. Reductions apply immediately.
 - **Milestones:** start on/after the project start; can't start before their dependencies are due; can't be worked on until dependencies are completed; no circular dependencies; can't be deleted while others depend on them. A due date after the predicted end is allowed but flagged.
 - **Nothing is deleted:** projects are archived (read-only, hidden by default) and users deactivated. An employee still on current projects can't be deactivated, and a manager with reports or projects can't be demoted until they're reassigned. The last admin can't be removed.
+- **Temporary passwords are single-use in practice:** until a user with an admin-issued password chooses their own (≥ 8 characters, a letter and a number, different from the temporary one), every API call except the change-password flow is refused (403 `password_change_required`), so the step can't be bypassed. Anyone can change their password later from My profile.
 - **Audit log:** every change, sign-in, sign-out and *denied attempt* is recorded with time, who (ID, name, role), what, and a field-by-field before/after. It's written in the **same transaction** as the change and the database **rejects UPDATE/DELETE/TRUNCATE** on it. Salaries are redacted; passwords never logged.
 - **Insights** (rule-based, not AI): over budget, budget ≥ 90% committed, overdue milestones, past predicted end with work open, milestones slipping past the end, active with no team, no milestones, staffing awaiting approval.
 
@@ -90,10 +91,10 @@ After editing `backend/_shared/pm_core`, run `./bin/sync-shared.sh` (LocalStack 
 
 ```sh
 cd backend && python3 -m venv .venv && .venv/bin/pip install -r requirements-dev.txt
-.venv/bin/pytest                      # 323 unit + integration tests (uses a separate pm_test database)
+.venv/bin/pytest                      # 335 unit + integration tests (uses a separate pm_test database)
 .venv/bin/ruff check . && .venv/bin/ruff format --check .
-cd ../frontend && npm test            # 125 component/service tests (Vitest + React Testing Library)
-npm run lint && npm run e2e           # ESLint; 8 Playwright end-to-end journeys against the running app
+cd ../frontend && npm test            # 133 component/service tests (Vitest + React Testing Library)
+npm run lint && npm run e2e           # ESLint; 9 Playwright end-to-end journeys against the running app
 cd .. && ./bin/smoke-test.sh          # 62 live API checks (local by default, or pass a URL)
 ```
 
@@ -150,7 +151,6 @@ docs/                workshop guides (unchanged)
 
 - **Hourly budget monitor on AWS:** the workshop's participant role is denied EventBridge and EventBridge Scheduler (`AccessDenied` on `events:ListRules` and `scheduler:ListSchedules`), so the hourly schedule is enabled on LocalStack only. On AWS the same check runs on demand (admin dashboard → *Run budget check now*); set `TF_VAR_aws_monitor_schedule_enabled=true` in an account that allows it.
 - **Aurora Serverless v2 auto-pauses** after idle time; the first request afterwards can take ~15-20 s while it resumes (the connection timeout allows for this).
-- No self-service password change (the brief limits employees to name and email); admins reset passwords.
 - Not a PWA (installable/offline) - deprioritised for time.
 - Holidays aren't modelled in working-day calculations (Mon-Fri, 8 h/day).
 

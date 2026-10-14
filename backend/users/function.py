@@ -230,8 +230,8 @@ def create_user(request: Request) -> Response:
         cur.execute(
             """
             INSERT INTO users (employee_id, first_name, last_name, email, job_title, salary,
-                               role, manager_id, password_hash)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                               role, manager_id, password_hash, must_change_password)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, TRUE)
             RETURNING id
             """,
             (
@@ -404,7 +404,8 @@ def reset_password(request: Request) -> Response:
     with transaction() as cur:
         row = _load_target(request, cur, lock=True)
         cur.execute(
-            "UPDATE users SET password_hash = %s, updated_at = now() WHERE id = %s",
+            # The admin has seen this password, so the user must replace it at next sign-in.
+            "UPDATE users SET password_hash = %s, must_change_password = TRUE, updated_at = now() WHERE id = %s",
             (passwords.hash_password(password), row["id"]),
         )
         audit.record(

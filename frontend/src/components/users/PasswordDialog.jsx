@@ -36,7 +36,9 @@ export default function PasswordDialog({ credentials, onClose }) {
             Password: <span data-testid="temporary-password">{credentials.password}</span>
           </div>
         </Box>
-        <Alert severity="warning">This password will not be shown again.</Alert>
+        <Alert severity="warning">
+          This password will not be shown again. They will be asked to choose their own password when they first sign in.
+        </Alert>
       </DialogContent>
       <DialogActions>
         <Button startIcon={<ContentCopyIcon />} onClick={handleCopy}>

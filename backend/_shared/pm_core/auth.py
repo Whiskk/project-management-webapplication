@@ -116,18 +116,28 @@ def load_active_user(cur: psycopg.Cursor, user_id: int) -> dict:
     return row
 
 
-def authenticate(request: Request) -> Actor:
-    """Resolve the Actor from the request's ``Authorization: Bearer`` header."""
+def authenticate(request: Request, allow_pending_password_change: bool = False) -> Actor:
+    """
+    Resolve the Actor from the request's ``Authorization: Bearer`` header.
+
+    Users who still have an admin-issued temporary password are refused
+    (403 ``password_change_required``) everywhere except the few endpoints
+    needed to change it, so the "choose a new password" step can't be bypassed
+    by calling the API directly.
+    """
     header = request.headers.get("authorization", "")
     scheme, _, token = header.partition(" ")
     if scheme.lower() != "bearer" or not token:
         raise Unauthorized("Authentication required")
     user_id = decode_token(token.strip(), "access")
     with db.transaction() as cur:
-        return actor_from_row(load_active_user(cur, user_id))
+        row = load_active_user(cur, user_id)
+    if row["must_change_password"] and not allow_pending_password_change:
+        raise ApiError(403, "password_change_required", "Choose a new password before continuing.")
+    return actor_from_row(row)
 
 
-def require_auth(*roles: str) -> Callable:
+def require_auth(*roles: str, allow_pending_password_change: bool = False) -> Callable:
     """
     Decorator enforcing authentication and (optionally) allowed roles.
 
@@ -139,6 +149,9 @@ def require_auth(*roles: str) -> Callable:
         @router.post("/")
         @require_auth("admin")
         def create_project(request): ...
+
+    ``allow_pending_password_change`` is only for the endpoints a user needs
+    while their temporary password is still active (me, change password, logout).
     """
     unknown = set(roles) - set(ROLES)
     if unknown:
@@ -147,7 +160,7 @@ def require_auth(*roles: str) -> Callable:
     def decorator(func: Callable[[Request], Response]) -> Callable[[Request], Response]:
         @functools.wraps(func)
         def wrapper(request: Request) -> Response:
-            request.actor = authenticate(request)
+            request.actor = authenticate(request, allow_pending_password_change)
             if roles and request.actor.role not in roles:
                 deny(request, f"requires role: {', '.join(roles)}")
             return func(request)

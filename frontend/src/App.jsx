@@ -3,6 +3,7 @@ import { Route, Routes } from 'react-router';
 import RequireAuth from './auth/RequireAuth';
 import RequirePermission from './auth/RequirePermission';
 import AppShell from './components/layout/AppShell';
+import ChangePasswordPage from './pages/ChangePasswordPage';
 import HomePage from './pages/HomePage';
 import LoginPage from './pages/LoginPage';
 import NotFoundPage from './pages/NotFoundPage';
@@ -22,6 +23,7 @@ export default function App() {
     <Routes>
       <Route path="/login" element={<LoginPage />} />
       <Route element={<RequireAuth />}>
+        <Route path="change-password" element={<ChangePasswordPage />} />
         <Route element={<AppShell />}>
           <Route index element={<HomePage />} />
           <Route path="profile" element={<ProfilePage />} />

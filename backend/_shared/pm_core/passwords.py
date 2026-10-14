@@ -25,6 +25,28 @@ def generate_password(length: int = PASSWORD_LENGTH) -> str:
     return "".join(secrets.choice(_ALPHABET) for _ in range(length))
 
 
+MIN_CHOSEN_LENGTH = 8
+MAX_CHOSEN_LENGTH = 128
+
+
+def check_new_password(new_password: str, current_password: str) -> str | None:
+    """
+    Rules for a password a user chooses themselves. Returns a message, or None if acceptable.
+
+    Generated temporary passwords (6 characters) can never satisfy these, so a
+    temporary password cannot simply be "changed" to itself.
+    """
+    if len(new_password) < MIN_CHOSEN_LENGTH:
+        return f"Must be at least {MIN_CHOSEN_LENGTH} characters"
+    if len(new_password) > MAX_CHOSEN_LENGTH:
+        return f"Must be at most {MAX_CHOSEN_LENGTH} characters"
+    if not any(ch.isalpha() for ch in new_password) or not any(ch.isdigit() for ch in new_password):
+        return "Must contain at least one letter and one number"
+    if new_password == current_password:
+        return "Must be different from your current password"
+    return None
+
+
 def hash_password(password: str, iterations: int = _ITERATIONS) -> str:
     """Hash a password as ``pbkdf2_sha256$<iterations>$<salt>$<hash>``."""
     salt = secrets.token_bytes(16)

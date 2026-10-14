@@ -10,6 +10,7 @@ import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import { useAuth } from '../auth/authContext';
 import { ROLE_LABELS } from '../auth/permissions';
+import ChangePasswordForm from '../components/auth/ChangePasswordForm';
 import { useNotify } from '../components/feedback/notificationContext';
 import { usersApi } from '../services/usersApi';
 import { fieldErrorsFrom } from '../utils/format';
@@ -106,6 +107,12 @@ export default function ProfilePage() {
               </Button>
             </div>
           </Stack>
+        </CardContent>
+      </Card>
+      <Card sx={{ maxWidth: 720 }}>
+        <CardContent>
+          <Typography variant="h3" component="h2" gutterBottom>Change password</Typography>
+          <ChangePasswordForm onChanged={() => notify('Password changed', 'success')} />
         </CardContent>
       </Card>
     </Stack>

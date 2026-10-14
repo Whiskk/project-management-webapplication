@@ -273,6 +273,8 @@ def test_cannot_remove_last_admin(fresh_db: None) -> None:
     with db.transaction() as cur:
         cur.execute("SELECT employee_id FROM users WHERE id = %s", (second_admin,))
         second_eid = cur.fetchone()["employee_id"]
+        # The new admin has already replaced their temporary password.
+        cur.execute("UPDATE users SET must_change_password = FALSE WHERE id = %s", (second_admin,))
     assert call("PATCH", f"/{user_id('AA7K2P')}", second_eid, {"role": "manager"})[0] == 200
     # Now only one admin is left, and they cannot deactivate themselves.
     assert call("POST", f"/{second_admin}/deactivate", second_eid)[0] == 409

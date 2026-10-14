@@ -5,12 +5,17 @@ Routes (under /api/auth):
     POST /login    {employee_id, password} -> tokens + user
     POST /refresh  {refresh_token}         -> tokens + user
     GET  /me                               -> current user
+    POST /change-password  {current_password, new_password} -> current user
     POST /logout                           -> 204 (audited; tokens are discarded client-side)
+
+Accounts created (or reset) by an admin get a temporary password and must
+choose their own at first sign-in; until then every other endpoint returns
+403 ``password_change_required``.
 """
 
 from pm_core import audit, auth, passwords
 from pm_core.db import transaction
-from pm_core.errors import ApiError, Unauthorized
+from pm_core.errors import ApiError, Unauthorized, ValidationError
 from pm_core.http import Request, Response, Router, no_content, ok
 from pm_core.validation import Field, validate
 
@@ -24,8 +29,13 @@ LOGIN_SPEC = {
     "password": Field("str", max_length=128),
 }
 REFRESH_SPEC = {"refresh_token": Field("str", max_length=4096)}
+CHANGE_PASSWORD_SPEC = {
+    "current_password": Field("str", max_length=128),
+    "new_password": Field("str", max_length=passwords.MAX_CHOSEN_LENGTH),
+}
 
 INVALID_CREDENTIALS = "Invalid employee ID or password"
+WRONG_CURRENT_MESSAGE = "Current password is incorrect"
 
 # Verified against when the employee id does not exist, so failed logins take
 # the same time whether or not the account exists (no user enumeration).
@@ -43,6 +53,7 @@ def public_user(row: dict) -> dict:
         "job_title": row["job_title"],
         "role": row["role"],
         "manager_id": row["manager_id"],
+        "must_change_password": row["must_change_password"],
     }
 
 
@@ -111,7 +122,7 @@ def refresh(request: Request) -> Response:
 
 
 @router.get("/me")
-@auth.require_auth()
+@auth.require_auth(allow_pending_password_change=True)
 def me(request: Request) -> Response:
     """Return the current user's profile."""
     with transaction() as cur:
@@ -119,8 +130,35 @@ def me(request: Request) -> Response:
     return ok(public_user(row))
 
 
+@router.post("/change-password")
+@auth.require_auth(allow_pending_password_change=True)
+def change_password(request: Request) -> Response:
+    """Replace your own password (required after an admin issues a temporary one)."""
+    data = validate(request.body, CHANGE_PASSWORD_SPEC)
+    actor = request.actor
+    with transaction() as cur:
+        cur.execute("SELECT * FROM users WHERE id = %s FOR NO KEY UPDATE", (actor.id,))
+        row = cur.fetchone()
+        if not passwords.verify_password(data["current_password"], row["password_hash"]):
+            raise ValidationError({"current_password": WRONG_CURRENT_MESSAGE})
+        problem = passwords.check_new_password(data["new_password"], data["current_password"])
+        if problem:
+            raise ValidationError({"new_password": problem})
+        cur.execute(
+            "UPDATE users SET password_hash = %s, must_change_password = FALSE, updated_at = now() WHERE id = %s",
+            (passwords.hash_password(data["new_password"]), actor.id),
+        )
+        forced = " (replacing a temporary password)" if row["must_change_password"] else ""
+        audit.record(
+            cur, actor, "auth.password_change", "user", actor.id, f"{actor.name} changed their password{forced}"
+        )
+        cur.execute("SELECT * FROM users WHERE id = %s", (actor.id,))
+        updated = cur.fetchone()
+    return ok(public_user(updated))
+
+
 @router.post("/logout")
-@auth.require_auth()
+@auth.require_auth(allow_pending_password_change=True)
 def logout(request: Request) -> Response:
     """Record a sign-out in the audit log."""
     actor = request.actor

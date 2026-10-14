@@ -9,15 +9,15 @@ import theme from '../theme';
 export const TEST_USERS = {
   admin: {
     id: 1, employee_id: 'AA7K2P', first_name: 'Alex', last_name: 'Admin',
-    email: 'alex.admin@example.com', job_title: 'Administrator', role: 'admin', manager_id: null,
+    email: 'alex.admin@example.com', job_title: 'Administrator', role: 'admin', manager_id: null, must_change_password: false,
   },
   manager: {
     id: 2, employee_id: 'MM4R8T', first_name: 'Morgan', last_name: 'Manager',
-    email: 'morgan.manager@example.com', job_title: 'Engineering Manager', role: 'manager', manager_id: null,
+    email: 'morgan.manager@example.com', job_title: 'Engineering Manager', role: 'manager', manager_id: null, must_change_password: false,
   },
   employee: {
     id: 3, employee_id: 'EE3H9W', first_name: 'Eli', last_name: 'Employee',
-    email: 'eli.employee@example.com', job_title: 'Software Engineer', role: 'employee', manager_id: 2,
+    email: 'eli.employee@example.com', job_title: 'Software Engineer', role: 'employee', manager_id: 2, must_change_password: false,
   },
 };
 

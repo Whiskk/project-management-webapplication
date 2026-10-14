@@ -69,7 +69,7 @@ describe('UsersPage', () => {
       role: 'employee', salary: 80000, manager_id: TEST_USERS.manager.id,
     });
     expect(await screen.findByTestId('temporary-password')).toHaveTextContent('Ab3dE9');
-    expect(screen.getByText('This password will not be shown again.')).toBeInTheDocument();
+    expect(screen.getByText(/This password will not be shown again. They will be asked to choose their own password/)).toBeInTheDocument();
   });
 
   it('deactivates a user after confirmation', async () => {

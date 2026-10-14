@@ -7,9 +7,9 @@ Results below are from **14 October 2026**, against commit `7a131b7` (local) and
 
 | Layer | Tool | Tests | Result | Coverage |
 |---|---|---|---|---|
-| Backend unit + integration | pytest (+ pytest-cov) against a real PostgreSQL `pm_test` database | **323** | ✅ all pass | **99%** of backend code |
-| Frontend components + services | Vitest + React Testing Library | **125** | ✅ all pass | **90.2% lines**, 88.9% statements, 85.2% branches, 79.3% functions |
-| End-to-end (browser) | Playwright (Chromium desktop + Pixel 7 mobile) | **8 journeys** | ✅ all pass **locally and on AWS** | all critical user paths (below) |
+| Backend unit + integration | pytest (+ pytest-cov) against a real PostgreSQL `pm_test` database | **335** | ✅ all pass | **99%** of backend code |
+| Frontend components + services | Vitest + React Testing Library | **133** | ✅ all pass | **90.2% lines**, 88.9% statements, 85.2% branches, 79.3% functions |
+| End-to-end (browser) | Playwright (Chromium desktop + Pixel 7 mobile) | **9 journeys** | ✅ all pass **locally and on AWS** | all critical user paths (below) |
 | Live API smoke test | `bin/smoke-test.sh` (curl) | **62 checks** | ✅ 62/62 **locally and on AWS** | every service and business rule |
 | Load | Artillery | 700 virtual users, 4,200 requests | ✅ 0 errors on AWS | see [Performance](#performance) |
 | Static analysis | ruff (Python), ESLint (JS), bandit (security), npm audit | - | ✅ all clean | - |
@@ -55,7 +55,7 @@ Every service is tested by calling its real Lambda `handler()` with Function URL
 | Area | What is proven |
 |---|---|
 | Core library | Router (paths with/without the CloudFront prefix, 404/405, JSON errors, hidden internals on 500), validation (every field type and message), password hashing, working days, peak-load and budget arithmetic, insight rules |
-| Auth | Login, refresh, me, logout; generic errors for unknown IDs; lockout after 5 failures; expired vs invalid tokens; inactive accounts; tokens signed with another secret |
+| Auth | Login, refresh, me, logout; forced change of admin-issued passwords (other endpoints blocked until done, password rules, wrong current password, reset forces it again, existing accounts untouched); generic errors for unknown IDs; lockout after 5 failures; expired vs invalid tokens; inactive accounts; tokens signed with another secret |
 | RBAC | Every role × every endpoint; role changes and deactivation take effect without a new token; denied writes audited |
 | Users | Generated IDs and one-time passwords; reporting-line, last-admin and self-protection rules; salary visibility; self-service limited to name/email |
 | Projects | Visibility per role; archive (read-only, hidden, never deleted) and reactivate; manager-only fields |
@@ -83,6 +83,7 @@ Run in real Chromium against the running app and backend; each run creates uniqu
 |---|---|
 | Each role lands on its own dashboard | Sign-in for all roles, role dashboards, sign-out |
 | Wrong password is refused | Error message on the login form |
+| **New hire** | Admin creates a user (initials-based ID) → the new hire signs in with the temporary password, is held on *Choose a new password* even when typing another URL → sets a password → lands on their dashboard → admin deactivates the test account |
 | Employees cannot reach admin pages, even by URL | Hidden navigation + route guards (Users, Audit log) |
 | Signed-out visitors are sent to sign in | Protected routes |
 | **Core journey** | Admin creates a project → manager adds a milestone and staffs an employee (live cost preview) → employee sees the project and their hours → admin archives it |
@@ -90,7 +91,7 @@ Run in real Chromium against the running app and backend; each run creates uniqu
 | **Cross-team approval** | Admin requests an employee's hours → their manager approves from the Approvals page → the decision appears in the project's audit history |
 | Mobile layout (Pixel 7) | Slide-out navigation |
 
-**Result:** 8/8 locally (≈45 s) and 8/8 against AWS (≈51 s).
+**Result:** 9/9 locally (≈55 s) and 9/9 against AWS.
 
 ## Performance
 
