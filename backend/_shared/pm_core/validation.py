@@ -21,7 +21,7 @@ _EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 class Field:
     """Validation rules for a single payload field."""
 
-    kind: str  # "str" | "email" | "date" | "int" | "decimal" | "bool" | "enum"
+    kind: str  # "str" | "email" | "date" | "int" | "decimal" | "bool" | "enum" | "list"
     required: bool = True
     max_length: int | None = None
     min_value: Decimal | int | None = None
@@ -98,6 +98,13 @@ def _coerce(value: Any, field: Field) -> Any:
         case "bool":
             if not isinstance(value, bool):
                 raise ValueError("Must be true or false")
+            return value
+        case "list":
+            # Element rules are domain-specific, so callers validate the items.
+            if not isinstance(value, list):
+                raise ValueError("Must be a list")
+            if field.max_length is not None and len(value) > field.max_length:
+                raise ValueError(f"Must have at most {field.max_length} items")
             return value
         case "date":
             if not isinstance(value, str):

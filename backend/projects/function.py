@@ -8,10 +8,12 @@ organised by sub-domain as it grows:
                          must not be captured by the /{id} route)
     project_routes     - project CRUD, archive / reactivate
     assignment_routes  - staffing with the 40-hour and budget rules
+    milestone_routes   - milestones with dependencies and tracking
 """
 
 import approval_routes
 import assignment_routes
+import milestone_routes
 import project_routes
 from pm_core.http import Router
 
@@ -19,6 +21,7 @@ router = Router("projects")
 approval_routes.register(router)
 project_routes.register(router)
 assignment_routes.register(router)
+milestone_routes.register(router)
 
 
 def handler(event: dict | None = None, context: object = None) -> dict:

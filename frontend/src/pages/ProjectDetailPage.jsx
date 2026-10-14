@@ -22,6 +22,7 @@ import { useNotify } from '../components/feedback/notificationContext';
 import ProjectFormDialog from '../components/projects/ProjectFormDialog';
 import ProjectStatusChip from '../components/projects/ProjectStatusChip';
 import ReactivateProjectDialog from '../components/projects/ReactivateProjectDialog';
+import MilestonesSection from '../components/projects/MilestonesSection';
 import TeamSection from '../components/projects/TeamSection';
 import useApiResource from '../hooks/useApiResource';
 import { projectsApi } from '../services/projectsApi';
@@ -188,6 +189,8 @@ export default function ProjectDetailPage() {
         showCosts={showMoney}
         onChanged={project.reload}
       />
+
+      <MilestonesSection project={data} canEdit={canEdit} />
 
       <Card>
         <CardContent>

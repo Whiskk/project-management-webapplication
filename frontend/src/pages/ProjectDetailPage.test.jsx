@@ -12,6 +12,7 @@ import ProjectDetailPage from './ProjectDetailPage';
 function renderAs(role, project = makeProject()) {
   vi.spyOn(projectsApi, 'get').mockResolvedValue(project);
   vi.spyOn(projectsApi, 'team').mockResolvedValue({ items: [] });
+  vi.spyOn(projectsApi, 'milestones').mockResolvedValue({ items: [], summary: { total: 0, completed: 0, overdue: 0, percent_complete: 0 } });
   return renderWithProviders(
     <Routes>
       <Route path="/projects/:projectId" element={<ProjectDetailPage />} />

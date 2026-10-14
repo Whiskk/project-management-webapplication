@@ -119,6 +119,20 @@ check "employee's manager approves" approved "$(curl -s -m 30 -X POST -H "$M" "$
 check "increase becomes pending" "5.0 7.0" "$(curl -s -m 30 -X PATCH -H "$A" -H "$J" -d '{"hours_per_week":7}' "$API/projects/$P1/assignments/$A1" | json 'str(d["hours_per_week"]) + " " + str(d["pending_hours"])')"
 check "manager rejects increase" "5.0 None" "$(curl -s -m 30 -X POST -H "$M" -H "$J" -d '{"note":"smoke test"}' "$API/projects/$P1/assignments/$A1/reject" | json 'str(d["assignment"]["hours_per_week"]) + " " + str(d["assignment"]["pending_hours"])')"
 
+echo "[milestones]"
+ms() { curl -s -m 30 -X POST -H "$M" -H "$J" -d "$1" "$API/projects/$P1/milestones" | json 'd["id"]'; }
+M1=$(ms '{"title":"Smoke design","start_date":"2031-03-03","due_date":"2031-03-05"}')
+M2=$(ms "{\"title\":\"Smoke build\",\"start_date\":\"2031-03-06\",\"due_date\":\"2031-03-12\",\"depends_on\":[$M1]}")
+check "manager adds dependent milestones" yes "$([ -n "$M1" ] && [ -n "$M2" ] && echo yes || echo no)"
+check "employee cannot add milestones" 403 "$(status -X POST -H "$E" -H "$J" -d '{}' "$API/projects/$P1/milestones")"
+check "cannot start before dependency is due" 400 "$(status -X PATCH -H "$M" -H "$J" -d '{"start_date":"2031-03-04"}' "$API/projects/$P1/milestones/$M2")"
+check "cannot start work before dependency is done" 409 "$(status -X PATCH -H "$M" -H "$J" -d '{"status":"in_progress"}' "$API/projects/$P1/milestones/$M2")"
+check "circular dependency is refused" 409 "$(status -X PATCH -H "$M" -H "$J" -d "{\"depends_on\":[$M2]}" "$API/projects/$P1/milestones/$M1")"
+check "complete dependency" 200 "$(status -X PATCH -H "$M" -H "$J" -d '{"status":"completed"}' "$API/projects/$P1/milestones/$M1")"
+check "then work can start" 200 "$(status -X PATCH -H "$M" -H "$J" -d '{"status":"in_progress"}' "$API/projects/$P1/milestones/$M2")"
+check "progress is tracked" 50 "$(curl -s -m 30 -H "$M" "$API/projects/$P1/milestones" | json 'd["summary"]["percent_complete"]')"
+check "cannot delete a milestone others depend on" 409 "$(status -X DELETE -H "$M" "$API/projects/$P1/milestones/$M1")"
+
 echo "[cleanup]"
 for pair in "$P1:$A1" "$P2:$A2"; do
     check "remove assignment ${pair#*:}" 204 "$(status -X DELETE -H "$A" "$API/projects/${pair%%:*}/assignments/${pair#*:}")"
