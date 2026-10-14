@@ -1,20 +1,20 @@
 # Testing
 
 How Project Hub is tested, how to run every suite, and the latest results.
-Results below are from **14 October 2026**, against commit `7a131b7` (local) and the AWS deployment at https://d37hjhs1g613o6.cloudfront.net.
+Results below are from **14 October 2026**, against commit `a99f17d` (local) and the AWS deployment at https://d37hjhs1g613o6.cloudfront.net.
 
 ## Summary
 
 | Layer | Tool | Tests | Result | Coverage |
 |---|---|---|---|---|
-| Backend unit + integration | pytest (+ pytest-cov) against a real PostgreSQL `pm_test` database | **335** | ✅ all pass | **99%** of backend code |
-| Frontend components + services | Vitest + React Testing Library | **133** | ✅ all pass | **90.2% lines**, 88.9% statements, 85.2% branches, 79.3% functions |
+| Backend unit + integration | pytest (+ pytest-cov) against a real PostgreSQL `pm_test` database | **335** | ✅ all pass | **98%** of backend code (1,994 statements, 37 uncovered) |
+| Frontend components + services | Vitest + React Testing Library | **133** | ✅ all pass | **90.6% lines**, 89.3% statements, 85.4% branches, 80.0% functions |
 | End-to-end (browser) | Playwright (Chromium desktop + Pixel 7 mobile) | **18 journeys** | ✅ all pass **locally and on AWS** | all critical user paths (below) |
 | Live API smoke test | `bin/smoke-test.sh` (curl) | **62 checks** | ✅ 62/62 **locally and on AWS** | every service and business rule |
 | Load | Artillery | 700 virtual users, 4,200 requests | ✅ 0 errors on AWS | see [Performance](#performance) |
 | Static analysis | ruff (Python), ESLint (JS), bandit (security), npm audit | - | ✅ all clean | - |
 
-Rubric targets (`docs/full-stack.md`): backend ≥ 80% ✅ (99%), frontend ≥ 80% ✅ (90% lines; functions 79%, see [Known gaps](#known-gaps)), API endpoints ≥ 90% ✅, error handling ≥ 90% ✅, critical paths 100% E2E ✅.
+Rubric targets (`docs/full-stack.md`): backend ≥ 80% ✅ (98%), frontend ≥ 80% ✅ (90.6% lines, 80% functions; see [Known gaps](#known-gaps)), API endpoints ≥ 90% ✅, error handling ≥ 90% ✅, critical paths 100% E2E ✅.
 
 ## How to run
 
@@ -136,7 +136,8 @@ Run against the deployed app after each release (the smoke test automates the AP
 
 ## Known gaps
 
-- **Frontend function coverage is 79%** (just under the 80% target; lines are 90%). The uncovered functions are mostly small inline event handlers (dialog cancel buttons, menu close handlers) whose behaviour is exercised by the E2E suite.
+- **Frontend function coverage is exactly 80%** (lines 90.6%). The uncovered functions are mostly small inline event handlers (dialog cancel buttons, menu close handlers) whose behaviour is exercised by the E2E suite. The thin API wrappers `usersApi.js` (11%) and `auditApi.js` (33%) are replaced by fakes in page tests, so they have no direct unit tests; their calls are covered end to end.
+- **The 2% of backend code not covered** is defensive handling of failures that are hard to provoke locally: resetting a dropped database connection, the cloud-only SSL setting, an audit write that itself fails, and a few rarely used filter branches.
 - **The hourly budget-monitor schedule is only exercised on LocalStack.** On AWS the participant role is denied EventBridge (see README → Known limitations); the on-demand trigger is tested on both.
 - **Load testing used one demo manager account** for all virtual users (realistic per-request cost, but not many distinct users' data).
 - Accessibility was checked through semantic roles and labels (every E2E and component test locates elements by role/label, as assistive technology does) rather than a dedicated audit tool such as axe.
