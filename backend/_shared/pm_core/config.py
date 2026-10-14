@@ -22,7 +22,10 @@ def postgres_conninfo() -> str:
         f"user={os.getenv('POSTGRES_USER', 'postgres')}",
         f"password={os.getenv('POSTGRES_PASS', 'postgres123')}",
         f"dbname={os.getenv('POSTGRES_NAME', 'postgres')}",
-        "connect_timeout=15",
+        # Aurora Serverless v2 auto-pauses when idle (min capacity 0) and takes
+        # ~15s+ to resume, so allow longer in the cloud - still under
+        # CloudFront's 30s origin timeout.
+        f"connect_timeout={15 if is_local() else 25}",
     ]
     if not is_local():
         parts.append("sslmode=require")

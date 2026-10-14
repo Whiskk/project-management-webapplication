@@ -1,3 +1,24 @@
+# Rewrites app routes (paths without a file extension, e.g. /projects/12) to
+# /index.html so the React router can handle them. Static files and /api/* are
+# untouched (API paths are served by their own cache behaviours anyway).
+resource "aws_cloudfront_function" "spa_routing" {
+  count   = data.aws_caller_identity.this.id != "000000000000" ? 1 : 0
+  name    = format("%s-spa-routing-%s", var.aws_project, local.app_id)
+  runtime = "cloudfront-js-2.0"
+  comment = "Serve index.html for single-page-app routes"
+  publish = true
+  code    = <<-EOT
+    function handler(event) {
+      var request = event.request;
+      var uri = request.uri;
+      if (!uri.startsWith('/api/') && uri.split('/').pop().indexOf('.') === -1) {
+        request.uri = '/index.html';
+      }
+      return request;
+    }
+  EOT
+}
+
 resource "aws_cloudfront_origin_access_control" "this" {
   count                             = data.aws_caller_identity.this.id != "000000000000" ? 1 : 0
   name                              = local.origin_id
@@ -39,12 +60,10 @@ resource "aws_cloudfront_distribution" "this" {
     }
   }
 
-  custom_error_response {
-    error_code            = 404
-    error_caching_min_ttl = 300
-    response_code         = 200
-    response_page_path    = "/index.html"
-  }
+  # Single-page-app routing is handled by the spa_routing CloudFront Function on
+  # the website (default) behaviour only. A distribution-wide 404 -> index.html
+  # rule would also rewrite API 404s into 200 HTML responses, and S3 returns 403
+  # (not 404) for unknown keys, so deep links like /projects would fail.
 
   # logging_config {
   #   include_cookies = false
@@ -89,6 +108,11 @@ resource "aws_cloudfront_distribution" "this" {
   default_cache_behavior {
     allowed_methods = ["GET", "HEAD", "OPTIONS"]
     cached_methods  = ["GET", "HEAD"]
+
+    function_association {
+      event_type   = "viewer-request"
+      function_arn = element(aws_cloudfront_function.spa_routing.*.arn, count.index)
+    }
 
     default_ttl = 3600
     max_ttl     = 86400
