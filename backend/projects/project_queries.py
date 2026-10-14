@@ -33,11 +33,13 @@ SELECT_PROJECT = sql.SQL(
            (SELECT COUNT(*) FROM milestones ms
             WHERE ms.project_id = p.id AND ms.status = 'completed') AS milestones_completed,
            (SELECT COUNT(*) FROM milestones ms
-            WHERE ms.project_id = p.id AND ms.status <> 'completed' AND ms.due_date < CURRENT_DATE) AS milestones_overdue,
+            WHERE ms.project_id = p.id AND ms.status <> 'completed'
+              AND ms.due_date < CURRENT_DATE) AS milestones_overdue,
            (SELECT COUNT(*) FROM milestones ms
             WHERE ms.project_id = p.id AND ms.due_date > p.predicted_end_date) AS milestones_past_end,
            (SELECT COUNT(*) FROM project_assignments a
-            WHERE a.project_id = p.id AND (a.status = 'pending' OR a.pending_hours IS NOT NULL)) AS pending_hours_requests,
+            WHERE a.project_id = p.id
+              AND (a.status = 'pending' OR a.pending_hours IS NOT NULL)) AS pending_hours_requests,
            CURRENT_DATE AS today
     FROM projects p
     JOIN users m ON m.id = p.manager_id
@@ -164,11 +166,15 @@ def serialize(row: dict, viewer: Actor) -> dict:
             "completed": row["milestones_completed"],
             "overdue": row["milestones_overdue"],
         },
-        **({
-            "projected_cost": cost,
-            "remaining_budget": row["budget"] - cost,
-            "over_budget": cost > row["budget"],
-        } if show_money else {}),
+        **(
+            {
+                "projected_cost": cost,
+                "remaining_budget": row["budget"] - cost,
+                "over_budget": cost > row["budget"],
+            }
+            if show_money
+            else {}
+        ),
         "allocated_hours": allocated_hours,
         **_my_assignment_fields(row.get("my_assignment")),
         "id": row["id"],

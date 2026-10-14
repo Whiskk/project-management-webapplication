@@ -19,14 +19,16 @@ BACKEND_DIR = Path(__file__).resolve().parent.parent
 TEST_DB = "pm_test"
 
 # Configure the environment before pm_core is imported anywhere.
-os.environ.update({
-    "IS_LOCAL": "true",
-    "POSTGRES_HOST": os.getenv("TEST_POSTGRES_HOST", "localhost"),
-    "POSTGRES_PORT": "5432",
-    "POSTGRES_USER": "postgres",
-    "POSTGRES_PASS": os.getenv("TEST_POSTGRES_PASS", "postgres123"),
-    "POSTGRES_NAME": TEST_DB,
-})
+os.environ.update(
+    {
+        "IS_LOCAL": "true",
+        "POSTGRES_HOST": os.getenv("TEST_POSTGRES_HOST", "localhost"),
+        "POSTGRES_PORT": "5432",
+        "POSTGRES_USER": "postgres",
+        "POSTGRES_PASS": os.getenv("TEST_POSTGRES_PASS", "postgres123"),
+        "POSTGRES_NAME": TEST_DB,
+    }
+)
 sys.path.insert(0, str(BACKEND_DIR / "_shared"))
 
 import psycopg  # noqa: E402

@@ -104,7 +104,9 @@ def test_pending_increase_is_reserved(setup: dict) -> None:
     assert status == 201
     assignment = _assignment(own, setup["emp"])
     # MGR001 is the employee's manager: an increase on their own project is immediate.
-    assert call("PATCH", f"/{own}/assignments/{assignment}", "MGR001", {"hours_per_week": 20})[1]["status"] == "approved"
+    assert (
+        call("PATCH", f"/{own}/assignments/{assignment}", "MGR001", {"hours_per_week": 20})[1]["status"] == "approved"
+    )
 
 
 def _assignment(project: int, emp: int) -> int:
@@ -174,8 +176,9 @@ def test_rejecting_an_increase_keeps_approved_hours(setup: dict) -> None:
     call("POST", f"/{setup['project']}/assignments/{assignment}/approve", "MGR001")
     call("PATCH", f"/{setup['project']}/assignments/{assignment}", "MGR002", {"hours_per_week": 15})
 
-    status, body = call("POST", f"/{setup['project']}/assignments/{assignment}/reject", "MGR001",
-                        {"note": "Needed on our release"})
+    status, body = call(
+        "POST", f"/{setup['project']}/assignments/{assignment}/reject", "MGR001", {"note": "Needed on our release"}
+    )
     assert (status, body["removed"], body["assignment"]["hours_per_week"]) == (200, False, 10.0)
     assert body["assignment"]["pending_hours"] is None
     [entry] = entries("assignment.reject")

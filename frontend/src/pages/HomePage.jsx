@@ -189,7 +189,7 @@ const DASHBOARDS = { admin: AdminDashboard, manager: ManagerDashboard, employee:
 export default function HomePage() {
   const { user } = useAuth();
   const fetchDashboard = useCallback((signal) => projectsApi.dashboard(signal), []);
-  const dashboard = useApiResource(fetchDashboard);
+  const dashboard = useApiResource(fetchDashboard, { refreshInterval: 30_000 });
   const Dashboard = DASHBOARDS[user?.role];
 
   return (

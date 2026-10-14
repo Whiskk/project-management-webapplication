@@ -50,7 +50,7 @@ export default function RequestsPage() {
   const [busy, setBusy] = useState(false);
 
   const fetchRequests = useCallback((signal) => projectsApi.requests({ status: filter }, signal), [filter]);
-  const requests = useApiResource(fetchRequests);
+  const requests = useApiResource(fetchRequests, { refreshInterval: 30_000 });
   const items = requests.data?.items ?? [];
 
   const refresh = () => {

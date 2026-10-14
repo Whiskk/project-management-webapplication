@@ -32,12 +32,27 @@ def running(fresh_db: None) -> int:
     start, end = today - timedelta(days=today.weekday()), today - timedelta(days=today.weekday()) + timedelta(days=11)
     with db.transaction() as cur:
         cur.execute("UPDATE users SET salary = 104000 WHERE employee_id = 'EMP001'")
-    _, project = call(projects, "POST", "/", "ADM001", {
-        "name": "Apollo", "budget": 1000, "manager_id": user_id("MGR001"), "status": "active",
-        "start_date": start.isoformat(), "predicted_end_date": end.isoformat(),
-    })
-    status, _ = call(projects, "POST", f"/{project['id']}/assignments", "MGR001",
-                     {"user_id": user_id("EMP001"), "hours_per_week": 10})
+    _, project = call(
+        projects,
+        "POST",
+        "/",
+        "ADM001",
+        {
+            "name": "Apollo",
+            "budget": 1000,
+            "manager_id": user_id("MGR001"),
+            "status": "active",
+            "start_date": start.isoformat(),
+            "predicted_end_date": end.isoformat(),
+        },
+    )
+    status, _ = call(
+        projects,
+        "POST",
+        f"/{project['id']}/assignments",
+        "MGR001",
+        {"user_id": user_id("EMP001"), "hours_per_week": 10},
+    )
     assert status == 201
     return project["id"]
 
@@ -71,8 +86,13 @@ def test_manager_dashboard_shows_team_load(running: int) -> None:
 def test_employee_dashboard_shows_week_and_milestones(running: int) -> None:
     today = date.today()
     monday = today - timedelta(days=today.weekday())
-    call(projects, "POST", f"/{running}/milestones", "MGR001",
-         {"title": "Kick-off", "start_date": monday.isoformat(), "due_date": (monday + timedelta(days=9)).isoformat()})
+    call(
+        projects,
+        "POST",
+        f"/{running}/milestones",
+        "MGR001",
+        {"title": "Kick-off", "start_date": monday.isoformat(), "due_date": (monday + timedelta(days=9)).isoformat()},
+    )
     status, body = call(projects, "GET", "/dashboard", "EMP001")
     assert (status, body["role"]) == (200, "employee")
     assert (body["stats"]["hours_this_week"], body["stats"]["capacity"]) == (10.0, 40.0)

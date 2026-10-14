@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { Suspense, useState } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router';
 import { useMediaQuery } from 'react-responsive';
 import AppBar from '@mui/material/AppBar';
 import Badge from '@mui/material/Badge';
 import Box from '@mui/material/Box';
+import CircularProgress from '@mui/material/CircularProgress';
 import Drawer from '@mui/material/Drawer';
 import IconButton from '@mui/material/IconButton';
 import List from '@mui/material/List';
@@ -106,7 +107,16 @@ export default function AppShell() {
 
       <Box component="main" sx={{ flexGrow: 1, minWidth: 0, p: { xs: 2, md: 3 } }}>
         <Toolbar />
-        <Outlet />
+        {/* Lazy-loaded pages: only the content area waits, the navigation stays. */}
+        <Suspense
+          fallback={(
+            <Box sx={{ display: 'grid', placeItems: 'center', py: 8 }}>
+              <CircularProgress aria-label="Loading page" />
+            </Box>
+          )}
+        >
+          <Outlet />
+        </Suspense>
       </Box>
     </Box>
   );

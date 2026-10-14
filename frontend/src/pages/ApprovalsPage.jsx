@@ -67,7 +67,7 @@ function RejectDialog({ request, busy, onConfirm, onClose }) {
 export default function ApprovalsPage() {
   const notify = useNotify();
   const fetchApprovals = useCallback((signal) => projectsApi.approvals(signal), []);
-  const approvals = useApiResource(fetchApprovals);
+  const approvals = useApiResource(fetchApprovals, { refreshInterval: 30_000 });
   const [busyId, setBusyId] = useState(null);
   const [rejecting, setRejecting] = useState(null);
   const items = approvals.data?.items ?? [];

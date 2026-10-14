@@ -10,9 +10,18 @@ from pm_core.insights import ProjectFacts, project_insights
 
 TODAY = date(2026, 11, 16)
 HEALTHY = ProjectFacts(
-    status="active", is_archived=False, start_date=date(2026, 11, 2), predicted_end_date=date(2026, 12, 18),
-    budget=Decimal(10000), projected_cost=Decimal(5000), team_size=3, pending_hours_requests=0,
-    milestones_total=4, milestones_completed=1, milestones_overdue=0, milestones_past_end=0,
+    status="active",
+    is_archived=False,
+    start_date=date(2026, 11, 2),
+    predicted_end_date=date(2026, 12, 18),
+    budget=Decimal(10000),
+    projected_cost=Decimal(5000),
+    team_size=3,
+    pending_hours_requests=0,
+    milestones_total=4,
+    milestones_completed=1,
+    milestones_overdue=0,
+    milestones_past_end=0,
 )
 
 

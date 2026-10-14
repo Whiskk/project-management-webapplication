@@ -40,8 +40,22 @@ def _parse_date(query: dict[str, str], name: str) -> date | None:
 
 def serialize(row: dict) -> dict:
     """An audit entry as shown in the Audit Log."""
-    keys = ("id", "occurred_at", "actor_id", "actor_employee_id", "actor_name", "actor_role", "action",
-            "entity_type", "entity_id", "project_id", "project_name", "summary", "changes", "outcome")
+    keys = (
+        "id",
+        "occurred_at",
+        "actor_id",
+        "actor_employee_id",
+        "actor_name",
+        "actor_role",
+        "action",
+        "entity_type",
+        "entity_id",
+        "project_id",
+        "project_name",
+        "summary",
+        "changes",
+        "outcome",
+    )
     return {key: row[key] for key in keys}
 
 
@@ -90,7 +104,8 @@ def list_entries(request: Request) -> Response:
         total = cur.fetchone()["n"]
         cur.execute(
             sql.SQL("SELECT l.*, p.name AS project_name FROM audit_log l LEFT JOIN projects p ON p.id = l.project_id")
-            + where + sql.SQL(" ORDER BY l.occurred_at DESC, l.id DESC LIMIT %s OFFSET %s"),
+            + where
+            + sql.SQL(" ORDER BY l.occurred_at DESC, l.id DESC LIMIT %s OFFSET %s"),
             [*params, limit, offset],
         )
         rows = cur.fetchall()

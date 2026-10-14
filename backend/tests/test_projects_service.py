@@ -137,7 +137,9 @@ def test_list_filters_and_search(fresh_db: None) -> None:
 def test_manager_updates_own_project_schedule_and_budget(fresh_db: None) -> None:
     project = create()
     status, body = call(
-        "PATCH", f"/{project['id']}", "MGR001",
+        "PATCH",
+        f"/{project['id']}",
+        "MGR001",
         {"budget": 60000, "predicted_end_date": "2026-11-20", "status": "active"},
     )
     assert status == 200

@@ -39,8 +39,20 @@ def _current_projects(cur: psycopg.Cursor, actor: Actor) -> list[dict]:
 
 def _summary(project: dict) -> dict:
     """Compact project entry for dashboard lists."""
-    keys = ("id", "name", "status", "manager_name", "predicted_end_date", "budget", "projected_cost",
-            "over_budget", "my_hours_per_week", "my_pending_hours", "insights", "milestones")
+    keys = (
+        "id",
+        "name",
+        "status",
+        "manager_name",
+        "predicted_end_date",
+        "budget",
+        "projected_cost",
+        "over_budget",
+        "my_hours_per_week",
+        "my_pending_hours",
+        "insights",
+        "milestones",
+    )
     return {key: project.get(key) for key in keys}
 
 
@@ -59,9 +71,7 @@ def _count(cur: psycopg.Cursor, query: str, params: tuple = ()) -> int:
 def _admin(cur: psycopg.Cursor, actor: Actor) -> dict:
     projects = _current_projects(cur, actor)
     live = [p for p in projects if p["status"] != "completed"]
-    cur.execute(
-        "SELECT role, COUNT(*) AS n FROM users WHERE is_active GROUP BY role"
-    )
+    cur.execute("SELECT role, COUNT(*) AS n FROM users WHERE is_active GROUP BY role")
     people = {row["role"]: row["n"] for row in cur.fetchall()}
     return {
         "role": "admin",
@@ -119,7 +129,8 @@ def _manager(cur: psycopg.Cursor, actor: Actor) -> dict:
                 (actor.id,),
             ),
             "my_pending_requests": _count(
-                cur, "SELECT COUNT(*) AS n FROM project_requests WHERE status = 'pending' AND requested_by = %s",
+                cur,
+                "SELECT COUNT(*) AS n FROM project_requests WHERE status = 'pending' AND requested_by = %s",
                 (actor.id,),
             ),
         },

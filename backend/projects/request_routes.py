@@ -64,9 +64,23 @@ _SELECT_REQUEST = sql.SQL(
 def serialize(row: dict) -> dict:
     """Public representation of a project request."""
     keys = (
-        "id", "name", "description", "start_date", "predicted_end_date", "budget", "justification", "status",
-        "requested_by", "requested_by_name", "requested_by_employee_id", "created_at",
-        "reviewed_by_name", "reviewed_at", "review_note", "project_id", "project_name",
+        "id",
+        "name",
+        "description",
+        "start_date",
+        "predicted_end_date",
+        "budget",
+        "justification",
+        "status",
+        "requested_by",
+        "requested_by_name",
+        "requested_by_employee_id",
+        "created_at",
+        "reviewed_by_name",
+        "reviewed_at",
+        "review_note",
+        "project_id",
+        "project_name",
     )
     return {key: row[key] for key in keys}
 
@@ -111,7 +125,8 @@ def register(router: Router) -> None:
         where = sql.SQL(" WHERE ") + sql.SQL(" AND ").join(conditions) if conditions else sql.SQL("")
         with transaction() as cur:
             cur.execute(
-                _SELECT_REQUEST + where
+                _SELECT_REQUEST
+                + where
                 + sql.SQL(" ORDER BY (r.status = 'pending') DESC, r.created_at DESC, r.id DESC"),
                 params,
             )
@@ -140,12 +155,23 @@ def register(router: Router) -> None:
                                               budget, justification)
                 VALUES (%s, %s, %s, %s, %s, %s, %s) RETURNING id
                 """,
-                (actor.id, data["name"], data.get("description", ""), data["start_date"],
-                 data["predicted_end_date"], data["budget"], data["justification"]),
+                (
+                    actor.id,
+                    data["name"],
+                    data.get("description", ""),
+                    data["start_date"],
+                    data["predicted_end_date"],
+                    data["budget"],
+                    data["justification"],
+                ),
             )
             row = _fetch(cur, cur.fetchone()["id"])
             audit.record(
-                cur, actor, "request.submit", "project_request", row["id"],
+                cur,
+                actor,
+                "request.submit",
+                "project_request",
+                row["id"],
                 f"{actor.name} requested a new project '{row['name']}' (budget ${row['budget']:,.2f})",
                 after=_audit_view(row),
             )
@@ -164,9 +190,14 @@ def register(router: Router) -> None:
             cur.execute("UPDATE project_requests SET status = 'withdrawn' WHERE id = %s", (row["id"],))
             after = _fetch(cur, row["id"])
             audit.record(
-                cur, actor, "request.withdraw", "project_request", row["id"],
+                cur,
+                actor,
+                "request.withdraw",
+                "project_request",
+                row["id"],
                 f"{actor.name} withdrew the request for '{row['name']}'",
-                before=_audit_view(row), after=_audit_view(after),
+                before=_audit_view(row),
+                after=_audit_view(after),
             )
         return ok(serialize(after))
 
@@ -213,9 +244,15 @@ def register(router: Router) -> None:
             after = _fetch(cur, row["id"])
             detail = f" with changes to {', '.join(adjusted)}" if adjusted else ""
             audit.record(
-                cur, actor, "request.approve", "project_request", row["id"],
+                cur,
+                actor,
+                "request.approve",
+                "project_request",
+                row["id"],
                 f"Approved the request for '{row['name']}' from {row['requested_by_name']}{detail}",
-                before=_audit_view(row), after=_audit_view(after), project_id=project["id"],
+                before=_audit_view(row),
+                after=_audit_view(after),
+                project_id=project["id"],
             )
         return ok(serialize(after))
 
@@ -237,8 +274,13 @@ def register(router: Router) -> None:
             )
             after = _fetch(cur, row["id"])
             audit.record(
-                cur, actor, "request.reject", "project_request", row["id"],
+                cur,
+                actor,
+                "request.reject",
+                "project_request",
+                row["id"],
                 f"Rejected the request for '{row['name']}' from {row['requested_by_name']} - {data['note']}",
-                before=_audit_view(row), after=_audit_view(after),
+                before=_audit_view(row),
+                after=_audit_view(after),
             )
         return ok(serialize(after))

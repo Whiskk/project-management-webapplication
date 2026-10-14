@@ -143,9 +143,7 @@ def _blockers_for_leaving_manager_role(cur: psycopg.Cursor, user_id: int) -> lis
     reports = cur.fetchone()["n"]
     if reports:
         reasons.append(f"they still have {reports} direct report(s) - reassign them first")
-    cur.execute(
-        "SELECT COUNT(*) AS n FROM projects WHERE manager_id = %s AND NOT is_archived", (user_id,)
-    )
+    cur.execute("SELECT COUNT(*) AS n FROM projects WHERE manager_id = %s AND NOT is_archived", (user_id,))
     projects = cur.fetchone()["n"]
     if projects:
         reasons.append(f"they still manage {projects} active project(s) - reassign them first")
@@ -210,10 +208,12 @@ def list_users(request: Request) -> Response:
         conditions.append(sql.SQL("u.manager_id = %s"))
         params.append(parse_id(query["manager_id"], "manager_id"))
     if query.get("q", "").strip():
-        conditions.append(sql.SQL(
-            "(u.first_name || ' ' || u.last_name ILIKE %s OR u.email ILIKE %s "
-            "OR u.employee_id ILIKE %s OR u.job_title ILIKE %s)"
-        ))
+        conditions.append(
+            sql.SQL(
+                "(u.first_name || ' ' || u.last_name ILIKE %s OR u.email ILIKE %s "
+                "OR u.employee_id ILIKE %s OR u.job_title ILIKE %s)"
+            )
+        )
         params.extend([f"%{query['q'].strip()}%"] * 4)
 
     where = sql.SQL(" WHERE ") + sql.SQL(" AND ").join(conditions) if conditions else sql.SQL("")
@@ -250,13 +250,24 @@ def create_user(request: Request) -> Response:
             RETURNING id
             """,
             (
-                employee_id, data["first_name"], data["last_name"], data["email"], data["job_title"],
-                data["salary"], data["role"], data["manager_id"], passwords.hash_password(password),
+                employee_id,
+                data["first_name"],
+                data["last_name"],
+                data["email"],
+                data["job_title"],
+                data["salary"],
+                data["role"],
+                data["manager_id"],
+                passwords.hash_password(password),
             ),
         )
         row = _fetch_user(cur, cur.fetchone()["id"])
         audit.record(
-            cur, request.actor, "user.create", "user", row["id"],
+            cur,
+            request.actor,
+            "user.create",
+            "user",
+            row["id"],
             f"Created {row['role']} {_full_name(row)} ({employee_id})",
             after=_audit_view(row),
         )
@@ -277,9 +288,14 @@ def update_me(request: Request) -> Response:
         changes = audit.diff(_audit_view(before), _audit_view(after))
         if changes:
             audit.record(
-                cur, actor, "user.update_self", "user", actor.id,
+                cur,
+                actor,
+                "user.update_self",
+                "user",
+                actor.id,
                 f"{actor.name} updated their profile ({', '.join(changes)})",
-                before=_audit_view(before), after=_audit_view(after),
+                before=_audit_view(before),
+                after=_audit_view(after),
             )
     return ok(serialize(after, actor))
 
@@ -324,9 +340,14 @@ def update_user(request: Request) -> Response:
             over = _projects_pushed_over_budget(cur, before, after) if "salary" in changes else []
             flag = f" - now over budget: {', '.join(over)}" if over else ""
             audit.record(
-                cur, actor, "user.update", "user", after["id"],
+                cur,
+                actor,
+                "user.update",
+                "user",
+                after["id"],
                 f"Updated {_full_name(after)} ({after['employee_id']}): {', '.join(changes)}{flag}",
-                before=_audit_view(before), after=_audit_view(after),
+                before=_audit_view(before),
+                after=_audit_view(after),
             )
     return ok(serialize(after, actor))
 
@@ -382,9 +403,7 @@ def _apply_update(cur: psycopg.Cursor, before: dict, data: dict) -> dict:
     """Write changed columns and return the refreshed row."""
     changed = {k: v for k, v in data.items() if before.get(k) != v}
     if changed:
-        assignments = sql.SQL(", ").join(
-            sql.SQL("{} = %s").format(sql.Identifier(column)) for column in changed
-        )
+        assignments = sql.SQL(", ").join(sql.SQL("{} = %s").format(sql.Identifier(column)) for column in changed)
         cur.execute(
             sql.SQL("UPDATE users SET {}, updated_at = now() WHERE id = %s").format(assignments),
             [*changed.values(), before["id"]],
@@ -404,7 +423,11 @@ def reset_password(request: Request) -> Response:
             (passwords.hash_password(password), row["id"]),
         )
         audit.record(
-            cur, request.actor, "user.reset_password", "user", row["id"],
+            cur,
+            request.actor,
+            "user.reset_password",
+            "user",
+            row["id"],
             f"Reset password for {_full_name(row)} ({row['employee_id']})",
         )
     return ok({"temporary_password": password})
@@ -427,9 +450,14 @@ def deactivate_user(request: Request) -> Response:
             raise Conflict(f"Cannot deactivate: {'; '.join(blockers)}")
         after = _apply_update(cur, before, {"is_active": False})
         audit.record(
-            cur, request.actor, "user.deactivate", "user", after["id"],
+            cur,
+            request.actor,
+            "user.deactivate",
+            "user",
+            after["id"],
             f"Deactivated {_full_name(after)} ({after['employee_id']})",
-            before=_audit_view(before), after=_audit_view(after),
+            before=_audit_view(before),
+            after=_audit_view(after),
         )
     return ok(serialize(after, request.actor))
 
@@ -446,9 +474,14 @@ def reactivate_user(request: Request) -> Response:
             _check_manager(cur, before["manager_id"], "employee", before["id"])
         after = _apply_update(cur, before, {"is_active": True})
         audit.record(
-            cur, request.actor, "user.reactivate", "user", after["id"],
+            cur,
+            request.actor,
+            "user.reactivate",
+            "user",
+            after["id"],
             f"Reactivated {_full_name(after)} ({after['employee_id']})",
-            before=_audit_view(before), after=_audit_view(after),
+            before=_audit_view(before),
+            after=_audit_view(after),
         )
     return ok(serialize(after, request.actor))
 

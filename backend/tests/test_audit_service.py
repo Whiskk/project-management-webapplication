@@ -26,14 +26,32 @@ def entries(fresh_db: None) -> None:
             "INSERT INTO projects (name, start_date, predicted_end_date, manager_id, budget) "
             "VALUES ('Apollo', '2026-11-02', '2026-11-30', 2, 1000)"
         )
-        audit.record(cur, ADMIN, "project.create", "project", 1, "Created project Apollo",
-                     after={"name": "Apollo"}, project_id=1)
-        audit.record(cur, MANAGER, "milestone.create", "milestone", 1, "Added milestone 'Design' to Apollo",
-                     project_id=1)
-        audit.record(cur, ADMIN, "user.update", "user", 3, "Updated Eli Employee (EMP001): job_title",
-                     before={"job_title": "Engineer"}, after={"job_title": "Lead"})
-        audit.record(cur, None, "auth.login", "user", None, "Failed sign-in for NOPE01",
-                     outcome="denied", actor_employee_id="NOPE01")
+        audit.record(
+            cur, ADMIN, "project.create", "project", 1, "Created project Apollo", after={"name": "Apollo"}, project_id=1
+        )
+        audit.record(
+            cur, MANAGER, "milestone.create", "milestone", 1, "Added milestone 'Design' to Apollo", project_id=1
+        )
+        audit.record(
+            cur,
+            ADMIN,
+            "user.update",
+            "user",
+            3,
+            "Updated Eli Employee (EMP001): job_title",
+            before={"job_title": "Engineer"},
+            after={"job_title": "Lead"},
+        )
+        audit.record(
+            cur,
+            None,
+            "auth.login",
+            "user",
+            None,
+            "Failed sign-in for NOPE01",
+            outcome="denied",
+            actor_employee_id="NOPE01",
+        )
 
 
 def summaries(body: dict) -> list[str]:
@@ -83,8 +101,14 @@ def test_date_range_is_inclusive_of_the_to_day(entries: None) -> None:
 
 @pytest.mark.parametrize(
     "query",
-    [{"from": "13/10/2026"}, {"from": "2026-10-14", "to": "2026-10-01"}, {"role": "boss"}, {"outcome": "maybe"},
-     {"project_id": "abc"}, {"page_size": "500"}],
+    [
+        {"from": "13/10/2026"},
+        {"from": "2026-10-14", "to": "2026-10-01"},
+        {"role": "boss"},
+        {"outcome": "maybe"},
+        {"project_id": "abc"},
+        {"page_size": "500"},
+    ],
 )
 def test_invalid_filters_are_rejected(entries: None, query: dict) -> None:
     assert call("/", query=query)[0] == 400

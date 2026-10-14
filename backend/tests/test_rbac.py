@@ -56,9 +56,12 @@ def test_role_restricted_write(fresh_db: None, employee_id: str, expected: int) 
 def test_denied_write_returns_consistent_error_and_is_audited(fresh_db: None) -> None:
     status, body = call("POST", "/", "EMP001")
     assert status == 403
-    assert body == {"error": {
-        "code": "forbidden", "message": "You do not have permission to perform this action",
-    }}
+    assert body == {
+        "error": {
+            "code": "forbidden",
+            "message": "You do not have permission to perform this action",
+        }
+    }
     [entry] = denied_entries()
     assert entry["actor_employee_id"] == "EMP001"
     assert entry["action"] == "access.denied"

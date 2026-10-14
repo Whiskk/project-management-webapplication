@@ -78,8 +78,11 @@ def test_manager_assigns_employee_and_cost_is_tracked(emp: int) -> None:
 
     entry = last_audit()
     assert (entry["action"], entry["actor_employee_id"], entry["project_id"]) == (
-        "assignment.create", "MGR001", project["id"])
-    assert "Assigned Eli Employee to Apollo for 10 h/week" == entry["summary"]
+        "assignment.create",
+        "MGR001",
+        project["id"],
+    )
+    assert entry["summary"] == "Assigned Eli Employee to Apollo for 10 h/week"
 
 
 def test_only_active_employees_can_be_assigned(emp: int) -> None:
@@ -142,8 +145,9 @@ def test_non_overlapping_projects_do_not_count_together(emp: int) -> None:
     assign(jan["id"], emp, 30)
     assign(mar["id"], emp, 30)
     assert assign(long["id"], emp, 10)[0] == 201
-    status, body = call("PATCH", f"/{long['id']}/assignments/{_assignment_id(long['id'], emp)}", "MGR001",
-                        {"hours_per_week": 11})
+    status, body = call(
+        "PATCH", f"/{long['id']}/assignments/{_assignment_id(long['id'], emp)}", "MGR001", {"hours_per_week": 11}
+    )
     assert status == 409
 
 

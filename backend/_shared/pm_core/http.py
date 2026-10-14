@@ -140,8 +140,16 @@ class Router:
         return self.route("PUT", pattern)
 
     def patch(self, pattern: str) -> Callable[[Handler], Handler]:
-        """Register a PATCH handler."""
-        return self.route("PATCH", pattern)
+        """
+        Register an update handler for both PATCH and PUT.
+
+        Updates have partial-update semantics (send only the fields to change),
+        which PATCH describes precisely; PUT is accepted too so clients using
+        the conventional ``PUT /resource/{id}`` work unchanged.
+        """
+        put = self.route("PUT", pattern)
+        patch = self.route("PATCH", pattern)
+        return lambda func: put(patch(func))
 
     def delete(self, pattern: str) -> Callable[[Handler], Handler]:
         """Register a DELETE handler."""

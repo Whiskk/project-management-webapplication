@@ -10,13 +10,18 @@ pytestmark = pytest.mark.db
 
 def test_migrations_create_all_tables(fresh_db: None) -> None:
     with db.transaction() as cur:
-        cur.execute(
-            "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public'"
-        )
+        cur.execute("SELECT table_name FROM information_schema.tables WHERE table_schema = 'public'")
         tables = {row["table_name"] for row in cur.fetchall()}
     assert {
-        "schema_version", "app_settings", "users", "projects", "project_assignments",
-        "milestones", "milestone_dependencies", "project_requests", "audit_log",
+        "schema_version",
+        "app_settings",
+        "users",
+        "projects",
+        "project_assignments",
+        "milestones",
+        "milestone_dependencies",
+        "project_requests",
+        "audit_log",
     } <= tables
 
 
@@ -39,7 +44,9 @@ def test_demo_users_are_seeded_with_hashed_passwords(fresh_db: None) -> None:
         )
         rows = cur.fetchall()
     assert [(r["employee_id"], r["role"]) for r in rows] == [
-        ("ADM001", "admin"), ("MGR001", "manager"), ("EMP001", "employee"),
+        ("ADM001", "admin"),
+        ("MGR001", "manager"),
+        ("EMP001", "employee"),
     ]
     assert rows[2]["manager"] == "MGR001"
     for row, demo in zip(rows, schema.DEMO_USERS, strict=True):
@@ -81,5 +88,7 @@ def test_health_endpoint_reports_schema_version(fresh_db: None) -> None:
     response = health.handler(make_event("GET", "/api/health"))
     assert response["statusCode"] == 200
     assert response_json(response) == {
-        "status": "ok", "database": "ok", "schema_version": len(schema.MIGRATIONS),
+        "status": "ok",
+        "database": "ok",
+        "schema_version": len(schema.MIGRATIONS),
     }

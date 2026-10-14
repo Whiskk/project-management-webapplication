@@ -14,6 +14,7 @@ from typing import Any
 import psycopg
 from psycopg import sql
 
+import staffing
 from pm_core import audit
 from pm_core.audit import Actor
 from pm_core.auth import require_auth
@@ -21,7 +22,6 @@ from pm_core.db import transaction
 from pm_core.errors import Conflict, ValidationError
 from pm_core.http import Request, Response, Router, created, ok
 from pm_core.validation import Field, parse_choice, parse_id, parse_pagination, validate
-import staffing
 from project_queries import (
     SELECT_PROJECT,
     attach_my_hours,
@@ -79,15 +79,26 @@ def insert_project(cur: psycopg.Cursor, actor: Actor, data: dict, source: str = 
         RETURNING id
         """,
         (
-            data["name"], data.get("description", ""), data["start_date"], data["predicted_end_date"],
-            data["manager_id"], data["budget"], data.get("status", "planned"), actor.id,
+            data["name"],
+            data.get("description", ""),
+            data["start_date"],
+            data["predicted_end_date"],
+            data["manager_id"],
+            data["budget"],
+            data.get("status", "planned"),
+            actor.id,
         ),
     )
     row = fetch_visible_project(cur, actor, cur.fetchone()["id"])
     audit.record(
-        cur, actor, "project.create", "project", row["id"],
+        cur,
+        actor,
+        "project.create",
+        "project",
+        row["id"],
         f"Created project {row['name']} (manager: {row['manager_name']}){source}",
-        after=audit_view(row), project_id=row["id"],
+        after=audit_view(row),
+        project_id=row["id"],
     )
     return row
 
@@ -178,9 +189,15 @@ def register(router: Router) -> None:
             changes = audit.diff(audit_view(before), audit_view(after))
             if changes:
                 audit.record(
-                    cur, actor, "project.update", "project", project_id,
+                    cur,
+                    actor,
+                    "project.update",
+                    "project",
+                    project_id,
                     f"Updated project {after['name']}: {', '.join(changes)}",
-                    before=audit_view(before), after=audit_view(after), project_id=project_id,
+                    before=audit_view(before),
+                    after=audit_view(after),
+                    project_id=project_id,
                 )
         return ok(serialize(after, actor))
 
@@ -200,8 +217,15 @@ def register(router: Router) -> None:
             )
             after = fetch_visible_project(cur, actor, project_id)
             audit.record(
-                cur, actor, "project.archive", "project", project_id, f"Archived project {after['name']}",
-                before=audit_view(before), after=audit_view(after), project_id=project_id,
+                cur,
+                actor,
+                "project.archive",
+                "project",
+                project_id,
+                f"Archived project {after['name']}",
+                before=audit_view(before),
+                after=audit_view(after),
+                project_id=project_id,
             )
         return ok(serialize(after, actor))
 
@@ -235,8 +259,15 @@ def register(router: Router) -> None:
             )
             after = fetch_visible_project(cur, actor, project_id)
             audit.record(
-                cur, actor, "project.reactivate", "project", project_id, f"Reactivated project {after['name']}",
-                before=audit_view(before), after=audit_view(after), project_id=project_id,
+                cur,
+                actor,
+                "project.reactivate",
+                "project",
+                project_id,
+                f"Reactivated project {after['name']}",
+                before=audit_view(before),
+                after=audit_view(after),
+                project_id=project_id,
             )
         return ok(serialize(after, actor))
 

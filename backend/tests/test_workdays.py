@@ -15,12 +15,12 @@ def brute_force(start: date, end: date) -> int:
 @pytest.mark.parametrize(
     ("start", "end", "expected"),
     [
-        (date(2026, 10, 12), date(2026, 10, 16), 5),   # Mon-Fri
-        (date(2026, 10, 12), date(2026, 10, 18), 5),   # Mon-Sun
-        (date(2026, 10, 17), date(2026, 10, 18), 0),   # weekend only
-        (date(2026, 10, 14), date(2026, 10, 14), 1),   # single weekday
-        (date(2026, 10, 16), date(2026, 10, 19), 2),   # Fri-Mon
-        (date(2026, 10, 20), date(2026, 10, 19), 0),   # end before start
+        (date(2026, 10, 12), date(2026, 10, 16), 5),  # Mon-Fri
+        (date(2026, 10, 12), date(2026, 10, 18), 5),  # Mon-Sun
+        (date(2026, 10, 17), date(2026, 10, 18), 0),  # weekend only
+        (date(2026, 10, 14), date(2026, 10, 14), 1),  # single weekday
+        (date(2026, 10, 16), date(2026, 10, 19), 2),  # Fri-Mon
+        (date(2026, 10, 20), date(2026, 10, 19), 0),  # end before start
     ],
 )
 def test_working_days(start: date, end: date, expected: int) -> None:

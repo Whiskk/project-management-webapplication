@@ -220,9 +220,7 @@ def test_manager_editing_own_record_is_denied_without_hanging(fresh_db: None) ->
 def test_admin_changes_salary_and_manager(fresh_db: None) -> None:
     _, created = call("POST", "/", "ADM001", {**NEW_EMPLOYEE, "email": "m2@example.com", "role": "manager"})
     new_manager = created["user"]["id"]
-    status, body = call(
-        "PATCH", f"/{user_id('EMP001')}", "ADM001", {"salary": 95000, "manager_id": new_manager}
-    )
+    status, body = call("PATCH", f"/{user_id('EMP001')}", "ADM001", {"salary": 95000, "manager_id": new_manager})
     assert status == 200
     assert body["manager_id"] == new_manager
     assert last_audit()["changes"]["salary"] == {"from": "[redacted]", "to": "[redacted]"}

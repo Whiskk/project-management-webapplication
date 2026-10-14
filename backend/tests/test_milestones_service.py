@@ -24,19 +24,34 @@ def user_id(employee_id: str) -> int:
 @pytest.fixture
 def project(fresh_db: None) -> int:
     """A project running through November 2026, managed by MGR001."""
-    status, body = call("POST", "/", "ADM001", {
-        "name": "Apollo", "budget": 100000, "manager_id": user_id("MGR001"),
-        "start_date": "2026-11-02", "predicted_end_date": "2026-11-30",
-    })
+    status, body = call(
+        "POST",
+        "/",
+        "ADM001",
+        {
+            "name": "Apollo",
+            "budget": 100000,
+            "manager_id": user_id("MGR001"),
+            "start_date": "2026-11-02",
+            "predicted_end_date": "2026-11-30",
+        },
+    )
     assert status == 201
     return body["id"]
 
 
-def add(project: int, title: str, start: str, due: str, depends_on: list[int] | None = None,
-        **extra: object) -> dict:
-    status, body = call("POST", f"/{project}/milestones", body={
-        "title": title, "start_date": start, "due_date": due, "depends_on": depends_on or [], **extra,
-    })
+def add(project: int, title: str, start: str, due: str, depends_on: list[int] | None = None, **extra: object) -> dict:
+    status, body = call(
+        "POST",
+        f"/{project}/milestones",
+        body={
+            "title": title,
+            "start_date": start,
+            "due_date": due,
+            "depends_on": depends_on or [],
+            **extra,
+        },
+    )
     assert status == 201, body
     return body
 
@@ -71,20 +86,32 @@ def test_create_and_list_with_dependencies(project: int) -> None:
 
 def test_team_members_can_view_but_not_edit(project: int) -> None:
     with db.transaction() as cur:
-        cur.execute("INSERT INTO project_assignments (project_id, user_id, hours_per_week) VALUES (%s, %s, 5)",
-                    (project, user_id("EMP001")))
+        cur.execute(
+            "INSERT INTO project_assignments (project_id, user_id, hours_per_week) VALUES (%s, %s, 5)",
+            (project, user_id("EMP001")),
+        )
     add(project, "Design", "2026-11-02", "2026-11-06")
     assert call("GET", f"/{project}/milestones", "EMP001")[0] == 200
-    assert call("POST", f"/{project}/milestones", "EMP001",
-                {"title": "x", "start_date": "2026-11-02", "due_date": "2026-11-03"})[0] == 403
+    assert (
+        call(
+            "POST",
+            f"/{project}/milestones",
+            "EMP001",
+            {"title": "x", "start_date": "2026-11-02", "due_date": "2026-11-03"},
+        )[0]
+        == 403
+    )
 
 
 def test_other_managers_cannot_edit_and_are_audited(project: int) -> None:
     with db.transaction() as cur:
-        cur.execute("INSERT INTO users (employee_id, first_name, last_name, email, role, password_hash) "
-                    "VALUES ('MGR002', 'Other', 'Manager', 'o@example.com', 'manager', 'x')")
-    status, _ = call("POST", f"/{project}/milestones", "MGR002",
-                     {"title": "x", "start_date": "2026-11-02", "due_date": "2026-11-03"})
+        cur.execute(
+            "INSERT INTO users (employee_id, first_name, last_name, email, role, password_hash) "
+            "VALUES ('MGR002', 'Other', 'Manager', 'o@example.com', 'manager', 'x')"
+        )
+    status, _ = call(
+        "POST", f"/{project}/milestones", "MGR002", {"title": "x", "start_date": "2026-11-02", "due_date": "2026-11-03"}
+    )
     assert status == 403
     assert last_audit()["outcome"] == "denied"
 
@@ -93,14 +120,18 @@ def test_other_managers_cannot_edit_and_are_audited(project: int) -> None:
 
 
 def test_due_date_must_follow_start_date(project: int) -> None:
-    status, body = call("POST", f"/{project}/milestones", body={
-        "title": "Backwards", "start_date": "2026-11-10", "due_date": "2026-11-09"})
+    status, body = call(
+        "POST",
+        f"/{project}/milestones",
+        body={"title": "Backwards", "start_date": "2026-11-10", "due_date": "2026-11-09"},
+    )
     assert (status, body["error"]["details"]["due_date"]) == (400, "Must be on or after the start date")
 
 
 def test_cannot_start_before_project(project: int) -> None:
-    status, body = call("POST", f"/{project}/milestones", body={
-        "title": "Early", "start_date": "2026-10-30", "due_date": "2026-11-03"})
+    status, body = call(
+        "POST", f"/{project}/milestones", body={"title": "Early", "start_date": "2026-10-30", "due_date": "2026-11-03"}
+    )
     assert status == 400
     assert "project start (2026-11-02)" in body["error"]["details"]["start_date"]
 
@@ -112,8 +143,11 @@ def test_due_after_project_end_is_allowed_but_flagged(project: int) -> None:
 
 def test_cannot_start_before_dependency_is_due(project: int) -> None:
     design = add(project, "Design", "2026-11-02", "2026-11-10")
-    status, body = call("POST", f"/{project}/milestones", body={
-        "title": "Build", "start_date": "2026-11-09", "due_date": "2026-11-20", "depends_on": [design["id"]]})
+    status, body = call(
+        "POST",
+        f"/{project}/milestones",
+        body={"title": "Build", "start_date": "2026-11-09", "due_date": "2026-11-20", "depends_on": [design["id"]]},
+    )
     assert status == 400
     assert body["error"]["details"]["start_date"] == "Must be on or after 2026-11-10, when 'Design' is due"
 
@@ -131,19 +165,34 @@ def test_moving_due_date_past_a_dependents_start_is_refused(project: int) -> Non
 
 
 def test_dependencies_must_be_in_the_same_project(project: int) -> None:
-    _, other = call("POST", "/", "ADM001", {
-        "name": "Other", "budget": 1, "manager_id": user_id("MGR001"),
-        "start_date": "2026-11-02", "predicted_end_date": "2026-11-30"})
+    _, other = call(
+        "POST",
+        "/",
+        "ADM001",
+        {
+            "name": "Other",
+            "budget": 1,
+            "manager_id": user_id("MGR001"),
+            "start_date": "2026-11-02",
+            "predicted_end_date": "2026-11-30",
+        },
+    )
     foreign = add(other["id"], "Foreign", "2026-11-02", "2026-11-03")
-    status, body = call("POST", f"/{project}/milestones", body={
-        "title": "x", "start_date": "2026-11-05", "due_date": "2026-11-06", "depends_on": [foreign["id"]]})
+    status, body = call(
+        "POST",
+        f"/{project}/milestones",
+        body={"title": "x", "start_date": "2026-11-05", "due_date": "2026-11-06", "depends_on": [foreign["id"]]},
+    )
     assert (status, body["error"]["details"]["depends_on"]) == (400, "Dependencies must be milestones of this project")
 
 
 @pytest.mark.parametrize("bad", ["1", [True], ["a"], {"id": 1}])
 def test_dependency_list_is_validated(project: int, bad: object) -> None:
-    status, _ = call("POST", f"/{project}/milestones", body={
-        "title": "x", "start_date": "2026-11-05", "due_date": "2026-11-06", "depends_on": bad})
+    status, _ = call(
+        "POST",
+        f"/{project}/milestones",
+        body={"title": "x", "start_date": "2026-11-05", "due_date": "2026-11-06", "depends_on": bad},
+    )
     assert status == 400
 
 

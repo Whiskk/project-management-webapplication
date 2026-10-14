@@ -47,7 +47,8 @@ def check_project_change(cur: psycopg.Cursor, before: dict, after: dict) -> None
       every assigned employee must still fit within 40 hours per week.
     """
     dates_changed = (before["start_date"], before["predicted_end_date"]) != (
-        after["start_date"], after["predicted_end_date"]
+        after["start_date"],
+        after["predicted_end_date"],
     )
     members = team(cur, before["id"])
 

@@ -270,3 +270,5 @@ backend/*/typing_extensions.py
 backend/.coverage
 backend/htmlcov/
 frontend/coverage/
+frontend/e2e-report/
+frontend/test-results/

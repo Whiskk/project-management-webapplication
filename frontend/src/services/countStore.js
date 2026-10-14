@@ -7,6 +7,8 @@ import { useEffect, useSyncExternalStore } from 'react';
  *
  * @param {() => Promise<number>} fetchCount - Loads the current count.
  */
+const BADGE_REFRESH_MS = 60_000;
+
 export function createCountStore(fetchCount) {
   let count = 0;
   const listeners = new Set();
@@ -35,8 +37,16 @@ export function createCountStore(fetchCount) {
   /** Current count; refreshes whenever `refreshKey` changes. `enabled = false` for roles without the badge. */
   const useCount = (enabled, refreshKey) => {
     useEffect(() => {
-      if (enabled) refresh();
-      else clear();
+      if (!enabled) {
+        clear();
+        return undefined;
+      }
+      refresh();
+      // Keep the badge current while the tab is visible (no WebSockets on Lambda URLs).
+      const timer = setInterval(() => {
+        if (document.visibilityState === 'visible') refresh();
+      }, BADGE_REFRESH_MS);
+      return () => clearInterval(timer);
     }, [enabled, refreshKey]);
     return useSyncExternalStore(subscribe, () => count);
   };

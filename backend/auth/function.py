@@ -69,7 +69,8 @@ def login(request: Request) -> Response:
 
     if _recent_failed_logins(employee_id) >= MAX_FAILED_LOGINS:
         raise ApiError(
-            429, "too_many_attempts",
+            429,
+            "too_many_attempts",
             f"Too many failed sign-in attempts. Try again in {LOCKOUT_MINUTES} minutes.",
         )
 
@@ -77,15 +78,16 @@ def login(request: Request) -> Response:
         cur.execute("SELECT * FROM users WHERE upper(employee_id) = %s", (employee_id,))
         row = cur.fetchone()
 
-    password_ok = passwords.verify_password(
-        data["password"], row["password_hash"] if row else _DUMMY_HASH
-    )
+    password_ok = passwords.verify_password(data["password"], row["password_hash"] if row else _DUMMY_HASH)
     if not row or not password_ok or not row["is_active"]:
         reason = "inactive account" if row and password_ok else "invalid credentials"
         # The person attempting may not be the account owner, so no actor is
         # recorded - only the employee id that was typed and the target account.
         audit.record_denied(
-            None, "auth.login", "user", row["id"] if row else None,
+            None,
+            "auth.login",
+            "user",
+            row["id"] if row else None,
             f"Failed sign-in for {employee_id} ({reason})",
             actor_employee_id=employee_id,
         )

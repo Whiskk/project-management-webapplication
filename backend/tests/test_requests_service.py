@@ -121,8 +121,7 @@ def test_approval_creates_the_project_managed_by_the_requester(fresh_db: None) -
 def test_admin_can_adjust_details_when_approving(fresh_db: None) -> None:
     other = add_manager()
     request = submit()
-    status, body = call("POST", f"/requests/{request['id']}/approve", "ADM001",
-                        {"budget": 60000, "manager_id": other})
+    status, body = call("POST", f"/requests/{request['id']}/approve", "ADM001", {"budget": 60000, "manager_id": other})
     assert status == 200
     _, project = call("GET", f"/{body['project_id']}", "ADM001")
     assert (project["budget"], project["manager_employee_id"]) == (60000.0, "MGR002")

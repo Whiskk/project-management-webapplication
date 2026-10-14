@@ -138,7 +138,9 @@ def serialize(row: dict, project: dict, viewer_role: str) -> dict:
         "total_hours": reserved * weeks,
     }
     if viewer_role != "employee":
-        result["cost"] = budget.assignment_cost(reserved, row["salary"], project["start_date"], project["predicted_end_date"])
+        result["cost"] = budget.assignment_cost(
+            reserved, row["salary"], project["start_date"], project["predicted_end_date"]
+        )
     return result
 
 
@@ -151,8 +153,9 @@ def register(router: Router) -> None:
         """The project team. Visible to anyone who can see the project."""
         with transaction() as cur:
             project = fetch_visible_project(cur, request.actor, parse_id(request.params["id"]))
-            cur.execute(_SELECT_ASSIGNMENTS + " WHERE a.project_id = %s ORDER BY u.last_name, u.first_name",
-                        (project["id"],))
+            cur.execute(
+                _SELECT_ASSIGNMENTS + " WHERE a.project_id = %s ORDER BY u.last_name, u.first_name", (project["id"],)
+            )
             rows = cur.fetchall()
         return ok({"items": [serialize(r, project, request.actor.role) for r in rows]})
 
@@ -184,21 +187,25 @@ def register(router: Router) -> None:
             options = []
             for employee in employees:
                 peak = capacity.committed_peak(cur, employee["id"], project)
-                options.append({
-                    "user_id": employee["id"],
-                    "employee_id": employee["employee_id"],
-                    "first_name": employee["first_name"],
-                    "last_name": employee["last_name"],
-                    "job_title": employee["job_title"],
-                    "manager_name": employee["manager_name"],
-                    "needs_approval": needs_approval(actor, employee),
-                    "assignment_id": employee["assignment_id"],
-                    "assigned_hours": employee["assigned_hours"],
-                    "committed_hours_elsewhere": peak.hours,
-                    "available_hours": max(capacity.MAX_WEEKLY_HOURS - peak.hours, Decimal(0)),
-                    # Unrounded (4 dp) so the UI's preview of hours x rate matches the server to the cent.
-                    "cost_per_weekly_hour": (weeks * employee["salary"] / budget.ANNUAL_HOURS).quantize(Decimal("0.0001")),
-                })
+                options.append(
+                    {
+                        "user_id": employee["id"],
+                        "employee_id": employee["employee_id"],
+                        "first_name": employee["first_name"],
+                        "last_name": employee["last_name"],
+                        "job_title": employee["job_title"],
+                        "manager_name": employee["manager_name"],
+                        "needs_approval": needs_approval(actor, employee),
+                        "assignment_id": employee["assignment_id"],
+                        "assigned_hours": employee["assigned_hours"],
+                        "committed_hours_elsewhere": peak.hours,
+                        "available_hours": max(capacity.MAX_WEEKLY_HOURS - peak.hours, Decimal(0)),
+                        # Unrounded (4 dp) so the UI's preview of hours x rate matches the server to the cent.
+                        "cost_per_weekly_hour": (weeks * employee["salary"] / budget.ANNUAL_HOURS).quantize(
+                            Decimal("0.0001")
+                        ),
+                    }
+                )
         return ok({"items": options})
 
     @router.post("/{id}/assignments")
@@ -228,18 +235,32 @@ def register(router: Router) -> None:
                                                  status, requested_by, requested_at)
                 VALUES (%s, %s, %s, %s, %s, %s, CASE WHEN %s THEN now() END) RETURNING id
                 """,
-                (project["id"], user["id"], hours, actor.id,
-                 "pending" if pending else "approved", actor.id if pending else None, pending),
+                (
+                    project["id"],
+                    user["id"],
+                    hours,
+                    actor.id,
+                    "pending" if pending else "approved",
+                    actor.id if pending else None,
+                    pending,
+                ),
             )
             row = load_assignment_view(cur, cur.fetchone()["id"])
             if pending:
-                summary = (f"Requested {fmt_hours(hours)} h/week of {name(user)} on {project['name']} "
-                           f"(awaiting approval from {row['approver_name']})")
+                summary = (
+                    f"Requested {fmt_hours(hours)} h/week of {name(user)} on {project['name']} "
+                    f"(awaiting approval from {row['approver_name']})"
+                )
             else:
                 summary = f"Assigned {name(user)} to {project['name']} for {fmt_hours(hours)} h/week"
             audit.record(
-                cur, actor, "assignment.request" if pending else "assignment.create", "assignment", row["id"],
-                summary, after={"user": user["employee_id"], "hours_per_week": hours, "status": row["status"]},
+                cur,
+                actor,
+                "assignment.request" if pending else "assignment.create",
+                "assignment",
+                row["id"],
+                summary,
+                after={"user": user["employee_id"], "hours_per_week": hours, "status": row["status"]},
                 project_id=project["id"],
             )
         return created(serialize(row, project, actor.role))
@@ -258,7 +279,9 @@ def register(router: Router) -> None:
         new_hours = data["hours_per_week"]
         with transaction() as cur:
             project = _writable_project(cur, request)
-            assignment = fetch_assignment(cur, project["id"], parse_id(request.params["assignment_id"], "assignment_id"))
+            assignment = fetch_assignment(
+                cur, project["id"], parse_id(request.params["assignment_id"], "assignment_id")
+            )
             user = staffing.lock_users(cur, [assignment["user_id"]])[assignment["user_id"]]
             old_reserved = reserved_hours(assignment)
             confirmed = Decimal(assignment["hours_per_week"])
@@ -271,28 +294,49 @@ def register(router: Router) -> None:
                 if not approval:
                     columns |= {"status": "approved", "requested_by": None, "requested_at": None}
                 action = "assignment.request" if approval else "assignment.update"
-                summary = (f"Changed requested hours of {name(user)} on {project['name']} to {fmt_hours(new_hours)} h/week"
-                           if approval else
-                           f"Assigned {name(user)} to {project['name']} for {fmt_hours(new_hours)} h/week")
+                summary = (
+                    f"Changed requested hours of {name(user)} on {project['name']} to {fmt_hours(new_hours)} h/week"
+                    if approval
+                    else f"Assigned {name(user)} to {project['name']} for {fmt_hours(new_hours)} h/week"
+                )
             elif approval and new_hours > confirmed:
                 columns = {"pending_hours": new_hours, "requested_by": actor.id, "requested_at": "now"}
                 action = "assignment.request"
-                summary = (f"Requested an increase for {name(user)} on {project['name']} from {fmt_hours(confirmed)} "
-                           f"to {fmt_hours(new_hours)} h/week (awaiting approval from {user_manager_name(cur, user)})")
+                summary = (
+                    f"Requested an increase for {name(user)} on {project['name']} from {fmt_hours(confirmed)} "
+                    f"to {fmt_hours(new_hours)} h/week (awaiting approval from {user_manager_name(cur, user)})"
+                )
             else:
-                columns = {"hours_per_week": new_hours, "pending_hours": None, "requested_by": None, "requested_at": None}
+                columns = {
+                    "hours_per_week": new_hours,
+                    "pending_hours": None,
+                    "requested_by": None,
+                    "requested_at": None,
+                }
                 action = "assignment.update"
-                summary = (f"Changed {name(user)}'s hours on {project['name']} from {fmt_hours(confirmed)} "
-                           f"to {fmt_hours(new_hours)} h/week")
+                summary = (
+                    f"Changed {name(user)}'s hours on {project['name']} from {fmt_hours(confirmed)} "
+                    f"to {fmt_hours(new_hours)} h/week"
+                )
 
-            before_state = {"hours_per_week": confirmed, "pending_hours": assignment["pending_hours"],
-                            "status": assignment["status"]}
+            before_state = {
+                "hours_per_week": confirmed,
+                "pending_hours": assignment["pending_hours"],
+                "status": assignment["status"],
+            }
             after_state = {key: columns.get(key, value) for key, value in before_state.items()}
             if after_state != before_state:
                 _update_assignment(cur, assignment["id"], columns)
                 audit.record(
-                    cur, actor, action, "assignment", assignment["id"], summary,
-                    before=before_state, after=after_state, project_id=project["id"],
+                    cur,
+                    actor,
+                    action,
+                    "assignment",
+                    assignment["id"],
+                    summary,
+                    before=before_state,
+                    after=after_state,
+                    project_id=project["id"],
                 )
             row = load_assignment_view(cur, assignment["id"])
         return ok(serialize(row, project, actor.role))
@@ -304,17 +348,26 @@ def register(router: Router) -> None:
         actor = request.actor
         with transaction() as cur:
             project = _writable_project(cur, request)
-            assignment = fetch_assignment(cur, project["id"], parse_id(request.params["assignment_id"], "assignment_id"))
+            assignment = fetch_assignment(
+                cur, project["id"], parse_id(request.params["assignment_id"], "assignment_id")
+            )
             cur.execute("SELECT * FROM users WHERE id = %s", (assignment["user_id"],))
             user = cur.fetchone()
             cur.execute("DELETE FROM project_assignments WHERE id = %s", (assignment["id"],))
             state = " (pending request cancelled)" if assignment["status"] == "pending" else ""
             audit.record(
-                cur, actor, "assignment.delete", "assignment", assignment["id"],
+                cur,
+                actor,
+                "assignment.delete",
+                "assignment",
+                assignment["id"],
                 f"Removed {name(user)} from {project['name']} "
                 f"(was {fmt_hours(assignment['hours_per_week'])} h/week){state}",
-                before={"user": user["employee_id"], "hours_per_week": assignment["hours_per_week"],
-                        "status": assignment["status"]},
+                before={
+                    "user": user["employee_id"],
+                    "hours_per_week": assignment["hours_per_week"],
+                    "status": assignment["status"],
+                },
                 project_id=project["id"],
             )
         return no_content()

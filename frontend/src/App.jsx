@@ -1,17 +1,21 @@
+import { lazy } from 'react';
 import { Route, Routes } from 'react-router';
 import RequireAuth from './auth/RequireAuth';
 import RequirePermission from './auth/RequirePermission';
 import AppShell from './components/layout/AppShell';
-import ApprovalsPage from './pages/ApprovalsPage';
-import AuditLogPage from './pages/AuditLogPage';
 import HomePage from './pages/HomePage';
 import LoginPage from './pages/LoginPage';
 import NotFoundPage from './pages/NotFoundPage';
-import ProfilePage from './pages/ProfilePage';
-import ProjectDetailPage from './pages/ProjectDetailPage';
-import ProjectsPage from './pages/ProjectsPage';
-import RequestsPage from './pages/RequestsPage';
-import UsersPage from './pages/UsersPage';
+
+// Pages most visits don't need are loaded on first use, keeping the initial bundle small
+// (AppShell shows a spinner in the content area while one loads).
+const ApprovalsPage = lazy(() => import('./pages/ApprovalsPage'));
+const AuditLogPage = lazy(() => import('./pages/AuditLogPage'));
+const ProfilePage = lazy(() => import('./pages/ProfilePage'));
+const ProjectDetailPage = lazy(() => import('./pages/ProjectDetailPage'));
+const ProjectsPage = lazy(() => import('./pages/ProjectsPage'));
+const RequestsPage = lazy(() => import('./pages/RequestsPage'));
+const UsersPage = lazy(() => import('./pages/UsersPage'));
 
 export default function App() {
   return (

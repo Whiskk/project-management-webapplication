@@ -125,12 +125,22 @@ def register(router: Router) -> None:
                     """,
                     (assignment["id"],),
                 )
-                summary = (f"Approved an increase for {name(employee)} on {project['name']} "
-                           f"from {fmt_hours(assignment['hours_per_week'])} to {fmt_hours(approved)} h/week")
+                summary = (
+                    f"Approved an increase for {name(employee)} on {project['name']} "
+                    f"from {fmt_hours(assignment['hours_per_week'])} to {fmt_hours(approved)} h/week"
+                )
             audit.record(
-                cur, actor, "assignment.approve", "assignment", assignment["id"], summary,
-                before={"status": assignment["status"], "hours_per_week": assignment["hours_per_week"],
-                        "pending_hours": assignment["pending_hours"]},
+                cur,
+                actor,
+                "assignment.approve",
+                "assignment",
+                assignment["id"],
+                summary,
+                before={
+                    "status": assignment["status"],
+                    "hours_per_week": assignment["hours_per_week"],
+                    "pending_hours": assignment["pending_hours"],
+                },
                 after={"status": "approved", "hours_per_week": approved, "pending_hours": None},
                 project_id=project["id"],
             )
@@ -149,8 +159,10 @@ def register(router: Router) -> None:
             reason = f" - {note}" if note else ""
             if assignment["status"] == "pending":
                 cur.execute("DELETE FROM project_assignments WHERE id = %s", (assignment["id"],))
-                summary = (f"Rejected {fmt_hours(assignment['hours_per_week'])} h/week for {name(employee)} "
-                           f"on {project['name']}{reason}")
+                summary = (
+                    f"Rejected {fmt_hours(assignment['hours_per_week'])} h/week for {name(employee)} "
+                    f"on {project['name']}{reason}"
+                )
                 result = None
             else:
                 cur.execute(
@@ -158,14 +170,24 @@ def register(router: Router) -> None:
                     "requested_at = NULL, updated_at = now() WHERE id = %s",
                     (assignment["id"],),
                 )
-                summary = (f"Rejected an increase for {name(employee)} on {project['name']} to "
-                           f"{fmt_hours(assignment['pending_hours'])} h/week (stays at "
-                           f"{fmt_hours(assignment['hours_per_week'])}){reason}")
+                summary = (
+                    f"Rejected an increase for {name(employee)} on {project['name']} to "
+                    f"{fmt_hours(assignment['pending_hours'])} h/week (stays at "
+                    f"{fmt_hours(assignment['hours_per_week'])}){reason}"
+                )
                 result = load_assignment_view(cur, assignment["id"])
             audit.record(
-                cur, actor, "assignment.reject", "assignment", assignment["id"], summary,
-                before={"status": assignment["status"], "hours_per_week": assignment["hours_per_week"],
-                        "pending_hours": assignment["pending_hours"]},
+                cur,
+                actor,
+                "assignment.reject",
+                "assignment",
+                assignment["id"],
+                summary,
+                before={
+                    "status": assignment["status"],
+                    "hours_per_week": assignment["hours_per_week"],
+                    "pending_hours": assignment["pending_hours"],
+                },
                 project_id=project["id"],
             )
         return ok({"assignment": serialize(result, project, actor.role) if result else None, "removed": result is None})

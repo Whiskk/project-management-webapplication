@@ -110,8 +110,13 @@ def _creates_cycle(milestones: dict[int, dict], milestone_id: int, depends_on: l
 
 
 def _check_schedule(
-    milestones: dict[int, dict], milestone_id: int | None, title: str, start: date, due: date,
-    depends_on: list[int], project: dict,
+    milestones: dict[int, dict],
+    milestone_id: int | None,
+    title: str,
+    start: date,
+    due: date,
+    depends_on: list[int],
+    project: dict,
 ) -> None:
     """Dates: inside the project start, after dependencies are due, and before dependents start."""
     errors: dict[str, str] = {}
@@ -122,9 +127,7 @@ def _check_schedule(
     late = [milestones[i] for i in depends_on if milestones[i]["due_date"] > start]
     if late:
         latest = max(late, key=lambda m: m["due_date"])
-        errors["start_date"] = (
-            f"Must be on or after {latest['due_date'].isoformat()}, when '{latest['title']}' is due"
-        )
+        errors["start_date"] = f"Must be on or after {latest['due_date'].isoformat()}, when '{latest['title']}' is due"
     if errors:
         raise ValidationError(errors)
 
@@ -139,8 +142,9 @@ def _check_schedule(
             )
 
 
-def _check_status(milestones: dict[int, dict], milestone_id: int | None, status: str, depends_on: list[int],
-                  old_status: str | None) -> None:
+def _check_status(
+    milestones: dict[int, dict], milestone_id: int | None, status: str, depends_on: list[int], old_status: str | None
+) -> None:
     """Work cannot start before its dependencies are done, or be reopened under started work."""
     if status in STARTED:
         blockers = [milestones[i]["title"] for i in depends_on if milestones[i]["status"] != "completed"]
@@ -150,7 +154,9 @@ def _check_status(milestones: dict[int, dict], milestone_id: int | None, status:
                 details={"status": "Blocked by incomplete dependencies"},
             )
     if old_status == "completed" and status != "completed" and milestone_id is not None:
-        started = [m["title"] for m in milestones.values() if milestone_id in m["depends_on"] and m["status"] in STARTED]
+        started = [
+            m["title"] for m in milestones.values() if milestone_id in m["depends_on"] and m["status"] in STARTED
+        ]
         if started:
             raise Conflict(
                 f"Cannot reopen: work that depends on it has already started ({', '.join(started)})",
@@ -173,7 +179,9 @@ def serialize(row: dict, milestones: dict[int, dict], project: dict, today: date
         "status": row["status"],
         "completed_at": row["completed_at"],
         "depends_on": [{"id": i, "title": milestones[i]["title"]} for i in row["depends_on"]],
-        "dependents": [{"id": m["id"], "title": m["title"]} for m in milestones.values() if row["id"] in m["depends_on"]],
+        "dependents": [
+            {"id": m["id"], "title": m["title"]} for m in milestones.values() if row["id"] in m["depends_on"]
+        ],
         "blocked_by": blocked_by,
         "can_start": not blocked_by,
         "overdue": row["status"] != "completed" and row["due_date"] < today,
@@ -227,10 +235,12 @@ def register(router: Router) -> None:
             project = fetch_visible_project(cur, request.actor, parse_id(request.params["id"]))
             milestones = _load_milestones(cur, project["id"])
             today = _today(cur)
-        return ok({
-            "items": [serialize(m, milestones, project, today) for m in milestones.values()],
-            "summary": summary(milestones, today),
-        })
+        return ok(
+            {
+                "items": [serialize(m, milestones, project, today) for m in milestones.values()],
+                "summary": summary(milestones, today),
+            }
+        )
 
     @router.post("/{id}/milestones")
     @require_auth("admin", "manager")
@@ -251,17 +261,30 @@ def register(router: Router) -> None:
                                         completed_at, created_by)
                 VALUES (%s, %s, %s, %s, %s, %s, CASE WHEN %s THEN now() END, %s) RETURNING id
                 """,
-                (project["id"], data["title"], data.get("description", ""), data["start_date"], data["due_date"],
-                 status, status == "completed", actor.id),
+                (
+                    project["id"],
+                    data["title"],
+                    data.get("description", ""),
+                    data["start_date"],
+                    data["due_date"],
+                    status,
+                    status == "completed",
+                    actor.id,
+                ),
             )
             milestone_id = cur.fetchone()["id"]
             _set_dependencies(cur, milestone_id, depends_on)
             milestones = _load_milestones(cur, project["id"])
             row = milestones[milestone_id]
             audit.record(
-                cur, actor, "milestone.create", "milestone", milestone_id,
+                cur,
+                actor,
+                "milestone.create",
+                "milestone",
+                milestone_id,
                 f"Added milestone '{row['title']}' to {project['name']}",
-                after=_audit_view(row), project_id=project["id"],
+                after=_audit_view(row),
+                project_id=project["id"],
             )
             result = serialize(row, milestones, project, _today(cur))
         return created(result)
@@ -281,7 +304,8 @@ def register(router: Router) -> None:
                 raise NotFound("Milestone not found")
             depends_on = (
                 _parse_dependencies(data["depends_on"], milestones, milestone_id)
-                if "depends_on" in data else before["depends_on"]
+                if "depends_on" in data
+                else before["depends_on"]
             )
             cycle = _creates_cycle(milestones, milestone_id, depends_on)
             if cycle:
@@ -290,22 +314,27 @@ def register(router: Router) -> None:
                     details={"depends_on": "Circular dependency"},
                 )
             after = {**before, **{k: v for k, v in data.items() if k != "depends_on"}, "depends_on": depends_on}
-            _check_schedule(milestones, milestone_id, after["title"], after["start_date"], after["due_date"],
-                            depends_on, project)
+            _check_schedule(
+                milestones, milestone_id, after["title"], after["start_date"], after["due_date"], depends_on, project
+            )
             _check_status(milestones, milestone_id, after["status"], depends_on, before["status"])
 
-            columns = {k: data[k] for k in ("title", "description", "start_date", "due_date", "status")
-                       if k in data and data[k] != before[k]}
+            columns = {
+                k: data[k]
+                for k in ("title", "description", "start_date", "due_date", "status")
+                if k in data and data[k] != before[k]
+            }
             if columns:
                 assignments = [sql.SQL("{} = %s").format(sql.Identifier(c)) for c in columns]
                 if "status" in columns:
                     # Completing stamps the time; any other status (e.g. reopening) clears it.
-                    assignments.append(sql.SQL(
-                        "completed_at = now()" if columns["status"] == "completed" else "completed_at = NULL"
-                    ))
+                    assignments.append(
+                        sql.SQL("completed_at = now()" if columns["status"] == "completed" else "completed_at = NULL")
+                    )
                 cur.execute(
                     sql.SQL("UPDATE milestones SET {}, updated_at = now() WHERE id = %s").format(
-                        sql.SQL(", ").join(assignments)),
+                        sql.SQL(", ").join(assignments)
+                    ),
                     [*columns.values(), milestone_id],
                 )
             if depends_on != before["depends_on"]:
@@ -316,9 +345,15 @@ def register(router: Router) -> None:
             changes = audit.diff(_audit_view(before), _audit_view(row))
             if changes:
                 audit.record(
-                    cur, actor, "milestone.update", "milestone", milestone_id,
+                    cur,
+                    actor,
+                    "milestone.update",
+                    "milestone",
+                    milestone_id,
                     f"Updated milestone '{row['title']}' on {project['name']}: {', '.join(changes)}",
-                    before=_audit_view(before), after=_audit_view(row), project_id=project["id"],
+                    before=_audit_view(before),
+                    after=_audit_view(row),
+                    project_id=project["id"],
                 )
             result = serialize(row, milestones, project, _today(cur))
         return ok(result)
@@ -340,8 +375,13 @@ def register(router: Router) -> None:
                 raise Conflict(f"Cannot delete: {', '.join(dependents)} depend(s) on it. Remove those links first.")
             cur.execute("DELETE FROM milestones WHERE id = %s", (milestone_id,))
             audit.record(
-                cur, actor, "milestone.delete", "milestone", milestone_id,
+                cur,
+                actor,
+                "milestone.delete",
+                "milestone",
+                milestone_id,
                 f"Deleted milestone '{row['title']}' from {project['name']}",
-                before=_audit_view(row), project_id=project["id"],
+                before=_audit_view(row),
+                project_id=project["id"],
             )
         return no_content()

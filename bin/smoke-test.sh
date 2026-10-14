@@ -91,6 +91,7 @@ check "admin creates projects" yes "$([ -n "$P1" ] && [ -n "$P2" ] && echo yes |
 check "manager sees own project" 200 "$(status -H "$M" "$API/projects/$P1")"
 check "unassigned employee gets 404" 404 "$(status -H "$E" "$API/projects/$P1")"
 check "manager cannot rename" 400 "$(status -X PATCH -H "$M" -H "$J" -d '{"name":"x"}' "$API/projects/$P1")"
+check "PUT also updates" 200 "$(status -X PUT -H "$M" -H "$J" -d '{"description":"smoke"}' "$API/projects/$P1")"
 
 echo "[staffing: 40-hour and budget rules]"
 AVAILABLE=$(curl -s -m 30 -H "$M" "$API/projects/$P1/staffing-options" | json "[o for o in d['items'] if o['user_id']==$EMP_ID][0]['available_hours']")

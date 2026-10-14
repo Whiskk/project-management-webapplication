@@ -37,8 +37,15 @@ def test_diff_of_created_record() -> None:
 def test_record_writes_entry_in_same_transaction(fresh_db: None) -> None:
     with db.transaction() as cur:
         audit.record(
-            cur, ACTOR, "project.update", "project", 5, "Updated project Apollo",
-            before={"name": "A"}, after={"name": "B"}, project_id=5,
+            cur,
+            ACTOR,
+            "project.update",
+            "project",
+            5,
+            "Updated project Apollo",
+            before={"name": "A"},
+            after={"name": "B"},
+            project_id=5,
         )
     with db.transaction() as cur:
         cur.execute("SELECT * FROM audit_log")

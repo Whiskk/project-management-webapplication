@@ -1,0 +1,72 @@
+# Artillery load test for the Project Hub API.
+#
+# Run (Artillery is fetched on demand, it is not a project dependency):
+#   npx artillery@2 run loadtest/api-load.yml --target https://<cloudfront-domain> \
+#       --variables '{"password":"<MGR001 password>"}' --output loadtest/results.json
+#   npx artillery@2 report loadtest/results.json   # optional HTML report
+#
+# Each virtual user signs in as the demo manager (a realistic, CPU-heavy
+# password check), then does what a manager does on opening the app:
+# dashboard, project list, the first project, its team and milestones.
+# Read-only, so it is safe to run against any environment.
+
+config:
+  target: "http://localhost:3001"
+  variables:
+    employee_id: "MGR001"
+    password: "Mngr01"
+  phases:
+    - name: warm-up (wakes Aurora and Lambda containers)
+      duration: 20
+      arrivalRate: 1
+    - name: ramp up
+      duration: 40
+      arrivalRate: 2
+      rampTo: 8
+    - name: sustained load
+      duration: 60
+      arrivalRate: 8
+  ensure:
+    # Fail the run (non-zero exit) if these service levels are not met.
+    thresholds:
+      - http.response_time.p95: 2000
+    maxErrorRate: 1
+  http:
+    timeout: 30
+
+scenarios:
+  - name: manager opens the app
+    flow:
+      - post:
+          url: "/api/auth/login"
+          json:
+            employee_id: "{{ employee_id }}"
+            password: "{{ password }}"
+          capture:
+            - json: "$.access_token"
+              as: token
+          expect:
+            - statusCode: 200
+      - get:
+          url: "/api/projects/dashboard"
+          headers:
+            Authorization: "Bearer {{ token }}"
+      - get:
+          url: "/api/projects?page_size=25"
+          headers:
+            Authorization: "Bearer {{ token }}"
+          capture:
+            - json: "$.items[0].id"
+              as: project_id
+      - get:
+          url: "/api/projects/{{ project_id }}"
+          headers:
+            Authorization: "Bearer {{ token }}"
+      - get:
+          url: "/api/projects/{{ project_id }}/assignments"
+          headers:
+            Authorization: "Bearer {{ token }}"
+      - get:
+          url: "/api/projects/{{ project_id }}/milestones"
+          headers:
+            Authorization: "Bearer {{ token }}"

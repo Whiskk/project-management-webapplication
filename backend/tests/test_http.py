@@ -36,6 +36,11 @@ def delete_widget(request: Request) -> Response:
     return no_content()
 
 
+@router.patch("/{id}")
+def update_widget(request: Request) -> Response:
+    return ok({"updated": request.params["id"], "with": request.body})
+
+
 @router.post("/{id}/explode")
 def explode(request: Request) -> Response:
     raise RuntimeError("secret internal detail")
@@ -102,8 +107,14 @@ def test_unknown_route_returns_404() -> None:
 
 
 def test_wrong_method_returns_405() -> None:
-    response = call("PUT", "/7")
+    response = call("POST", "/7")
     assert response["statusCode"] == 405
+
+
+@pytest.mark.parametrize("method", ["PATCH", "PUT"])
+def test_updates_accept_patch_and_put(method: str) -> None:
+    response = call(method, "/7", body={"name": "w"})
+    assert response_json(response) == {"updated": "7", "with": {"name": "w"}}
 
 
 def test_options_preflight_returns_204() -> None:

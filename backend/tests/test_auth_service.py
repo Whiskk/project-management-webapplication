@@ -136,7 +136,8 @@ def test_expired_token_returns_token_expired_code(fresh_db: None) -> None:
     past = datetime.now(UTC) - timedelta(hours=1)
     token = jwt.encode(
         {"sub": "1", "type": "access", "iat": past, "exp": past + timedelta(minutes=1)},
-        auth._get_secret(), algorithm="HS256",
+        auth._get_secret(),
+        algorithm="HS256",
     )
     status, body = call("GET", "/me", headers={"Authorization": f"Bearer {token}"})
     assert status == 401
@@ -146,7 +147,8 @@ def test_expired_token_returns_token_expired_code(fresh_db: None) -> None:
 def test_token_signed_with_other_secret_is_rejected(fresh_db: None) -> None:
     token = jwt.encode(
         {"sub": "1", "type": "access", "exp": datetime.now(UTC) + timedelta(minutes=5)},
-        "attacker-secret", algorithm="HS256",
+        "attacker-secret",
+        algorithm="HS256",
     )
     assert call("GET", "/me", headers={"Authorization": f"Bearer {token}"})[0] == 401
 
