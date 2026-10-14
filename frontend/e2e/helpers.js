@@ -7,6 +7,13 @@ export const USERS = {
   employee: { id: 'EE3H9W', password: process.env.E2E_EMPLOYEE_PASSWORD || 'Empl01', name: 'Eli Employee' },
 };
 
+/**
+ * An employee ID that belongs to nobody, new each run. Tests that deliberately
+ * fail a sign-in use it, so they never count towards a real account's lockout
+ * (5 failures in 15 minutes locks that ID).
+ */
+export const unknownEmployeeId = () => `ZZ${Date.now().toString(36).slice(-4).toUpperCase()}`;
+
 /** A name unique to this run, so journeys never collide with real data. */
 export const unique = (label) => `E2E ${label} ${Date.now().toString(36)}`;
 

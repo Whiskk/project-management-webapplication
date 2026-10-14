@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { signIn, signOut, USERS } from './helpers';
+import { signIn, signOut, unknownEmployeeId } from './helpers';
 
 test.describe('sign-in and access control', () => {
   test('each role lands on its own dashboard', async ({ page }) => {
@@ -17,7 +17,7 @@ test.describe('sign-in and access control', () => {
 
   test('a wrong password is refused with a clear message', async ({ page }) => {
     await page.goto('/login');
-    await page.getByLabel('Employee ID').fill(USERS.employee.id);
+    await page.getByLabel('Employee ID').fill(unknownEmployeeId());
     await page.getByLabel('Password').fill('wrong!');
     await page.getByRole('button', { name: 'Sign in' }).click();
     await expect(page.getByText('Invalid employee ID or password')).toBeVisible();

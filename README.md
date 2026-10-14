@@ -104,6 +104,7 @@ cd .. && ./bin/smoke-test.sh          # 62 live API checks (local by default, or
 ./bin/deploy-backend.sh aws           # Terraform: Lambdas, Aurora, S3, CloudFront (+ migrations on first request)
 ./bin/deploy-frontend.sh aws          # builds with the CloudFront URL, uploads to S3, invalidates the cache
 ./bin/smoke-test.sh https://<cloudfront-domain>    # with SMOKE_*_PASSWORD set (see below)
+./bin/e2e-live.sh [--ui | --headed]   # Playwright journeys against the live site (reads the demo passwords itself)
 ```
 
 **Demo accounts on AWS use random passwords** (the repository is public, so the documented local passwords are never used in the cloud). They are logged once, privately, when the database is first seeded:
@@ -131,7 +132,7 @@ frontend/
   src/               React app (auth/, pages/, components/<feature>/, services/, hooks/, utils/)
   e2e/               Playwright journeys
 infra/               Terraform (template) + cloudfront.tf SPA routing + scheduler.tf
-bin/                 dev/deploy scripts, build-backend.sh, smoke-test.sh
+bin/                 dev/deploy scripts, build-backend.sh, smoke-test.sh, e2e-live.sh
 loadtest/            Artillery load test
 docs/                workshop guides (unchanged)
 ```

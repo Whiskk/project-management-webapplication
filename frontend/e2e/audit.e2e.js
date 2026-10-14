@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { signIn, signOut, USERS } from './helpers';
+import { signIn, signOut, unknownEmployeeId } from './helpers';
 
 /** Admin: open the audit log filtered by a search term; returns the newest matching row. */
 async function newestAuditRow(page, search) {
@@ -44,8 +44,9 @@ test('employees edit only their own name and email, and the change is audited', 
 });
 
 test('failed sign-ins show up in the audit log as denied', async ({ page }) => {
+  const employeeId = unknownEmployeeId();
   await page.goto('/login');
-  await page.getByLabel('Employee ID').fill(USERS.employee.id);
+  await page.getByLabel('Employee ID').fill(employeeId);
   await page.getByLabel('Password').fill('not-the-password1');
   await page.getByRole('button', { name: 'Sign in' }).click();
   await expect(page.getByText('Invalid employee ID or password')).toBeVisible();
@@ -54,6 +55,6 @@ test('failed sign-ins show up in the audit log as denied', async ({ page }) => {
   await page.goto('/audit');
   await page.getByRole('combobox', { name: 'Outcome' }).click();
   await page.getByRole('option', { name: 'Denied' }).click();
-  const row = await newestAuditRow(page, `Failed sign-in for ${USERS.employee.id}`);
+  const row = await newestAuditRow(page, `Failed sign-in for ${employeeId}`);
   await expect(row.getByText('Denied')).toBeVisible();
 });

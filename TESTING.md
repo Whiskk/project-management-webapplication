@@ -9,7 +9,7 @@ Results below are from **14 October 2026**, against commit `7a131b7` (local) and
 |---|---|---|---|---|
 | Backend unit + integration | pytest (+ pytest-cov) against a real PostgreSQL `pm_test` database | **335** | ✅ all pass | **99%** of backend code |
 | Frontend components + services | Vitest + React Testing Library | **133** | ✅ all pass | **90.2% lines**, 88.9% statements, 85.2% branches, 79.3% functions |
-| End-to-end (browser) | Playwright (Chromium desktop + Pixel 7 mobile) | **18 journeys** | ✅ all pass locally (the original 9 also on AWS) | all critical user paths (below) |
+| End-to-end (browser) | Playwright (Chromium desktop + Pixel 7 mobile) | **18 journeys** | ✅ all pass **locally and on AWS** | all critical user paths (below) |
 | Live API smoke test | `bin/smoke-test.sh` (curl) | **62 checks** | ✅ 62/62 **locally and on AWS** | every service and business rule |
 | Load | Artillery | 700 virtual users, 4,200 requests | ✅ 0 errors on AWS | see [Performance](#performance) |
 | Static analysis | ruff (Python), ESLint (JS), bandit (security), npm audit | - | ✅ all clean | - |
@@ -36,7 +36,7 @@ npm audit --audit-level=high                    # the same check CI runs
 # End-to-end (start the app first: ./bin/start-dev.sh)
 npx playwright install chromium                 # once
 npm run e2e                                     # local
-E2E_BASE_URL=https://<cloudfront> E2E_ADMIN_PASSWORD=... E2E_MANAGER_PASSWORD=... E2E_EMPLOYEE_PASSWORD=... npm run e2e
+../bin/e2e-live.sh                              # AWS: reads the demo passwords from CloudWatch; add --ui or --headed to watch
 
 # Live smoke test (local by default)
 ./bin/smoke-test.sh
@@ -100,7 +100,7 @@ Run in real Chromium against the running app and backend; each run creates uniqu
 | Dashboard navigation | Dashboard tiles link to the matching pages |
 | Mobile layout (Pixel 7) | Slide-out navigation |
 
-**Result:** 18/18 locally.
+**Result:** 18/18 locally (≈2.3 min) and 18/18 against AWS.
 
 To watch the journeys run (e.g. for a demo), from `frontend/`: `npx playwright test --ui` (pick and replay tests step by step), or `npx playwright test --headed --project=desktop` (a real browser window).
 
