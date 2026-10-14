@@ -17,6 +17,7 @@ import EditIcon from '@mui/icons-material/Edit';
 import UnarchiveIcon from '@mui/icons-material/Unarchive';
 import { useAuth } from '../auth/authContext';
 import { can } from '../auth/permissions';
+import ProjectHistory from '../components/audit/ProjectHistory';
 import ConfirmDialog from '../components/common/ConfirmDialog';
 import { useNotify } from '../components/feedback/notificationContext';
 import InsightList from '../components/projects/InsightList';
@@ -194,6 +195,8 @@ export default function ProjectDetailPage() {
       />
 
       <MilestonesSection project={data} canEdit={canEdit} />
+
+      {can(user, 'audit.view') && <ProjectHistory projectId={data.id} />}
 
       <Card>
         <CardContent>

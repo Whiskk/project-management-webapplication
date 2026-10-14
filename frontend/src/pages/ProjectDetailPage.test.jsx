@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { Route, Routes } from 'react-router';
 import { describe, expect, it, vi } from 'vitest';
 import { ApiError } from '../services/api';
+import { auditApi } from '../services/auditApi';
 import { projectsApi } from '../services/projectsApi';
 import { usersApi } from '../services/usersApi';
 import { makeProject } from '../test/fixtures';
@@ -12,6 +13,7 @@ import ProjectDetailPage from './ProjectDetailPage';
 function renderAs(role, project = makeProject()) {
   vi.spyOn(projectsApi, 'get').mockResolvedValue(project);
   vi.spyOn(projectsApi, 'team').mockResolvedValue({ items: [] });
+  vi.spyOn(auditApi, 'list').mockResolvedValue({ items: [], total: 0 });
   vi.spyOn(projectsApi, 'milestones').mockResolvedValue({ items: [], summary: { total: 0, completed: 0, overdue: 0, percent_complete: 0 } });
   return renderWithProviders(
     <Routes>

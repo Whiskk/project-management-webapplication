@@ -147,6 +147,12 @@ check "approval creates the project" 4000.0 "$(curl -s -m 30 -H "$M" "$API/proje
 check "decided request cannot be decided again" 409 "$(status -X POST -H "$A" -H "$J" -d '{"note":"x"}' "$API/projects/requests/$R1/reject")"
 check "archive requested project (cleanup)" 200 "$(status -X POST -H "$A" "$API/projects/$P3/archive")"
 
+echo "[audit log]"
+check "manager cannot read the audit log" 403 "$(status -H "$M" "$API/audit")"
+check "admin sees this run's project in the log" True "$(curl -s -m 30 -H "$A" "$API/audit?project_id=$P1&page_size=200" | json 'any(i["action"] == "project.create" for i in d["items"])')"
+check "denied attempts are recorded" True "$(curl -s -m 30 -H "$A" "$API/audit?outcome=denied&actor=MGR001&page_size=5" | json 'd["total"] > 0')"
+check "audit log has no write routes" 405 "$(status -X DELETE -H "$A" "$API/audit")"
+
 echo "[cleanup]"
 for pair in "$P1:$A1" "$P2:$A2"; do
     check "remove assignment ${pair#*:}" 204 "$(status -X DELETE -H "$A" "$API/projects/${pair%%:*}/assignments/${pair#*:}")"

@@ -3,6 +3,7 @@ import RequireAuth from './auth/RequireAuth';
 import RequirePermission from './auth/RequirePermission';
 import AppShell from './components/layout/AppShell';
 import ApprovalsPage from './pages/ApprovalsPage';
+import AuditLogPage from './pages/AuditLogPage';
 import HomePage from './pages/HomePage';
 import LoginPage from './pages/LoginPage';
 import NotFoundPage from './pages/NotFoundPage';
@@ -24,6 +25,9 @@ export default function App() {
           <Route path="projects/:projectId" element={<ProjectDetailPage />} />
           <Route element={<RequirePermission permission="approvals.review" />}>
             <Route path="approvals" element={<ApprovalsPage />} />
+          </Route>
+          <Route element={<RequirePermission permission="audit.view" />}>
+            <Route path="audit" element={<AuditLogPage />} />
           </Route>
           <Route element={<RequirePermission permission="requests.view" />}>
             <Route path="requests" element={<RequestsPage />} />

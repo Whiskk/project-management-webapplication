@@ -16,6 +16,7 @@ import AccountCircleIcon from '@mui/icons-material/AccountCircle';
 import AssignmentTurnedInIcon from '@mui/icons-material/AssignmentTurnedIn';
 import DashboardIcon from '@mui/icons-material/Dashboard';
 import FolderIcon from '@mui/icons-material/Folder';
+import HistoryIcon from '@mui/icons-material/History';
 import InboxIcon from '@mui/icons-material/Inbox';
 import MenuIcon from '@mui/icons-material/Menu';
 import PeopleIcon from '@mui/icons-material/People';
@@ -34,6 +35,7 @@ const NAV_ITEMS = [
   { to: '/approvals', label: 'Approvals', icon: <AssignmentTurnedInIcon />, permission: 'approvals.review', badge: 'approvals' },
   { to: '/requests', label: 'Requests', icon: <InboxIcon />, permission: 'requests.view', badge: 'requests' },
   { to: '/users', label: 'Users', icon: <PeopleIcon />, permission: 'users.view' },
+  { to: '/audit', label: 'Audit log', icon: <HistoryIcon />, permission: 'audit.view' },
   { to: '/profile', label: 'My profile', icon: <AccountCircleIcon /> },
 ];
 
