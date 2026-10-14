@@ -272,3 +272,4 @@ backend/htmlcov/
 frontend/coverage/
 frontend/e2e-report/
 frontend/test-results/
+loadtest/results*.json

@@ -1,113 +1,159 @@
-# Coding Workshop
+# Project Hub
 
-The goal of this coding workshop is to enable and assess the hands-on skills
-of participants through development of a practical technical solution that
-solves a theoretical business problem.
+A project-management web app for **Admins, Managers and Employees**: create and staff projects, plan milestones with dependencies, keep labour costs inside budgets, never overbook anyone beyond 40 hours a week, and keep a tamper-proof audit trail of everything that happens.
 
-## Getting Started
+Built for the Citi Coding Workshop (Full Stack track) on the required stack: **React + Material UI + React Responsive → Python AWS Lambdas → PostgreSQL**, deployed to AWS with Terraform and shell scripts.
 
-Navigate to [Coding Workshop - Main Guide](./docs/README.md) to get started.
+- **Live (AWS):** https://d37hjhs1g613o6.cloudfront.net
+- **Testing:** see [TESTING.md](./TESTING.md) for commands, results, coverage and known gaps
+- **Workshop guides:** [docs/](./docs/README.md)
 
-## Coding Workshop Example
+---
 
-Coding workshop organizer(s) will provide instructions to follow by email. Here
-below is a real example of requirements and expectations for participant(s):
+## Contents
 
-### Requirements: Business Problem
+1. [What it does](#what-it-does)
+2. [Business rules](#business-rules)
+3. [Architecture](#architecture)
+4. [Running it locally](#running-it-locally)
+5. [Deploying to AWS](#deploying-to-aws)
+6. [Repository layout](#repository-layout)
+7. [Design decisions and trade-offs](#design-decisions-and-trade-offs)
+8. [Known limitations](#known-limitations)
 
-Our company ACME Inc. is going through a massive organizational transformation
-to become a more data-driven organization. Information about teams structure
-and performance is currently scattered across multiple systems, making it
-difficult to get a comprehensive view of team dynamics and achievements.
+---
 
-We are struggling to answer simple questions like:
+## What it does
 
-* Who are the members of each team?
-* Where are the teams located?
-* What are the key achievements of each team on a monthly basis?
-* How many teams have team leader not co-located with team members?
-* How many teams have team leader as a non-direct staff?
-* How many teams have non-direct staff to employees ratio above 20%?
-* How many teams are reporting to an organization leader?
+| Role | Can do |
+|---|---|
+| **Admin** | Create every account (employee IDs and 6-character passwords are generated; the password is shown once). Create, edit, archive and reactivate projects and assign their manager. Approve or reject managers' project requests (approving creates the project, optionally with adjusted budget/dates/manager). See the organisation dashboard, the full **Audit log**, and each project's history. Run the budget check. |
+| **Manager** | See and run the projects they manage: schedule, budget, status, **milestones with dependencies**, and **staffing** (hours per week). Staff any employee; staffing someone else's report sends the hours to that employee's manager for **approval**. Approve or reject hours requested for their own reports. Request new projects. Edit their direct reports' basic details. Dashboard with their team's load this week. |
+| **Employee** | See the projects they're assigned to, their hours (and hours awaiting approval), the team and milestones - never budgets or costs. Update their own name and email. Dashboard showing their week against 40 hours and upcoming milestones. |
 
-### Requirements: Technical Solution
+Everything is responsive: a permanent sidebar on desktop, a slide-out menu and simplified tables on phones.
 
-As part of this transformation, we are looking to build a centralized team
-management tool that will allow us to track team members, team locations,
-monthly team achievements, as well as individual-level and team-level metadata.
-Initial focus is to provide a self-service capability without any integrations
-with other tools such as Employee Directory, Project Tracking, or Performance
-Management.
+## Business rules
 
-The technical solution involves developing a stand-alone web application using
-modern technologies. The application will have the following features:
+These are enforced **on the server** (the UI previews them, but the API is the gatekeeper):
 
-* User authentication and authorization
-* Role-based access control
-* CRUD operations for individuals, teams, achievements and metadata
-* Search and filter functionality
-* Responsive design for mobile and desktop usage
+- **40-hour week:** an employee's hours across current projects can never exceed 40 in any week. The check uses their *busiest overlapping period* - 30 h in January plus 30 h in March doesn't block 10 h on a January-March project.
+- **Budget is a hard limit:** projected labour cost = Σ hours/week × working weeks × (annual salary ÷ 2080). Adding people, raising hours, cutting the budget or extending dates past it are refused (409 with the exact overage). Reducing hours or removing people is always allowed, so an over-budget project can be fixed.
+- **Pay rises are never blocked** by a project budget; affected projects are flagged over budget and named in the audit entry.
+- **Cross-team approval:** hours for someone else's report (requested by another manager *or* an admin) wait for that employee's own manager. Pending hours are *reserved* against both rules, so approving can never fail. Reductions apply immediately.
+- **Milestones:** start on/after the project start; can't start before their dependencies are due; can't be worked on until dependencies are completed; no circular dependencies; can't be deleted while others depend on them. A due date after the predicted end is allowed but flagged.
+- **Nothing is deleted:** projects are archived (read-only, hidden by default) and users deactivated. An employee still on current projects can't be deactivated, and a manager with reports or projects can't be demoted until they're reassigned. The last admin can't be removed.
+- **Audit log:** every change, sign-in, sign-out and *denied attempt* is recorded with time, who (ID, name, role), what, and a field-by-field before/after. It's written in the **same transaction** as the change and the database **rejects UPDATE/DELETE/TRUNCATE** on it. Salaries are redacted; passwords never logged.
+- **Insights** (rule-based, not AI): over budget, budget ≥ 90% committed, overdue milestones, past predicted end with work open, milestones slipping past the end, active with no team, no milestones, staffing awaiting approval.
 
-### Requirements: Technology Stack
+## Architecture
 
-The following technologies are required to build the application:
+```mermaid
+graph LR
+    Browser["React + MUI SPA"] -->|HTTPS| CF["CloudFront"]
+    CF -->|"/ (static)"| S3["S3 website bucket"]
+    CF -->|"/api/auth*"| L1["auth"]
+    CF -->|"/api/users*"| L2["users"]
+    CF -->|"/api/projects*"| L3["projects"]
+    CF -->|"/api/audit*"| L4["audit (read-only)"]
+    CF -->|"/api/monitor*"| L5["monitor"]
+    CF -->|"/api/health*"| L6["health"]
+    EB["EventBridge (hourly)"] -.-> L5
+    L1 & L2 & L3 & L4 & L5 & L6 --> DB[("Aurora PostgreSQL")]
+```
 
-* Frontend: HTML, CSS, React.js with React Responsive and Material UI Components
-* Backend: Python
-* Database: PostgreSQL
+- **Six Lambda services**, one per domain, each a folder under `backend/` (Terraform discovers them automatically). The `projects` service is split into route modules (projects, staffing, approvals, milestones, requests, dashboard) so related writes share one transaction.
+- **Shared core library** `backend/_shared/pm_core` (router, error format, validation, JWT/RBAC, audit, DB/migrations, budget, capacity, insights), copied into each service by [`bin/sync-shared.sh`](./bin/sync-shared.sh) because each Lambda is packaged on its own.
+- **PostgreSQL only** (Aurora PostgreSQL Serverless v2 on AWS, PostgreSQL locally). Schema migrations run automatically from the Lambdas on first use (Aurora isn't reachable from the workshop VDI), guarded by an advisory lock. The template's MongoDB is not used.
+- **Consistent API:** JSON everywhere, errors as `{"error": {"code", "message", "details"}}`, status codes 200/201/204/400/401/403/404/405/409/429/500, `PATCH` and `PUT` for updates, filtering and pagination via query parameters.
+- **Frontend:** organised by feature (`auth/`, `pages/`, `components/<feature>/`, `services/`, `hooks/`); one API client with transparent token refresh; a central permissions map that hides what a role can't do; lazily loaded pages; 30 s polling for near-real-time data.
 
-The following technologies are good to know, as they are used to manage and
-deploy code:
+## Running it locally
 
-* Version Control: Git, GitHub
-* Infrastructure: Terraform
-* Deployment Mode: Shell Scripts
-* Deployment Target: AWS Serverless (e.g. S3, CloudFront, Lambda, RDS)
+**Prerequisites:** the workshop VDI (Docker, LocalStack Pro with `LOCALSTACK_AUTH_TOKEN`, PostgreSQL, Terraform, Node 22, Python 3.13), as checked by [docs/validation.md](./docs/validation.md).
 
-### Expectations: Value-Based Outcomes
+```sh
+./bin/start-dev.sh            # Postgres, LocalStack, deploys all Lambdas, proxy :3001, React :3000
+```
 
-By the end of the workshop, participants will have developed a functional
-web application that meets the requirements outlined above. The application
-will be deployed to a cloud environment and accessible via a web browser.
-Participants will also gain hands-on experience with modern web development
-technologies and best practices.
+Open **http://localhost:3000** and sign in with a demo account (local only - see below for AWS):
 
-## Contributing
+| Role | Employee ID | Password |
+|---|---|---|
+| Admin | `ADM001` | `Admin1` |
+| Manager | `MGR001` | `Mngr01` |
+| Employee | `EMP001` | `Empl01` |
 
-See the [CONTRIBUTING](./CONTRIBUTING.md) resource for more details.
+After editing `backend/_shared/pm_core`, run `./bin/sync-shared.sh` (LocalStack runs the service folders directly, so changes are live).
 
-## License
+**Checks** (details in [TESTING.md](./TESTING.md)):
 
-This library is licensed under the MIT-0 License.
-See the [LICENSE](./LICENSE) resource for more details.
+```sh
+cd backend && python3 -m venv .venv && .venv/bin/pip install -r requirements-dev.txt
+.venv/bin/pytest                      # 312 unit + integration tests (uses a separate pm_test database)
+.venv/bin/ruff check . && .venv/bin/ruff format --check .
+cd ../frontend && npm test            # 125 component/service tests (Vitest + React Testing Library)
+npm run lint && npm run e2e           # ESLint; 8 Playwright end-to-end journeys against the running app
+cd .. && ./bin/smoke-test.sh          # 62 live API checks (local by default, or pass a URL)
+```
 
-## Roadmap
+## Deploying to AWS
 
-See the
-[open issues](https://github.com/citi/coding-workshop-participant/issues)
-for a list of proposed roadmap features (and known issues).
+```sh
+./bin/deploy-backend.sh aws           # Terraform: Lambdas, Aurora, S3, CloudFront (+ migrations on first request)
+./bin/deploy-frontend.sh aws          # builds with the CloudFront URL, uploads to S3, invalidates the cache
+./bin/smoke-test.sh https://<cloudfront-domain>    # with SMOKE_*_PASSWORD set (see below)
+```
 
-## Security
+**Demo accounts on AWS use random passwords** (the repository is public, so the documented local passwords are never used in the cloud). They are logged once, privately, when the database is first seeded:
 
-See the
-[Security Issue Notifications](./CONTRIBUTING.md#security-issue-notifications)
-resource for more details.
+```sh
+source ENVIRONMENT.config && aws logs tail /aws/lambda/coding-workshop-health-<app-id> --since 24h | grep "one-time passwords"
+```
 
-## Authors
+Sign in as `ADM001` with that password and reset the others from **Users**.
 
-The following people have contributed to this workshop:
+## Repository layout
 
-* Colin Heilman - [@heilmancs](https://github.com/heilmancs)
-* Eugene Istrati - [@eistrati](https://github.com/eistrati)
-* Isaiah Cornelius Smith - [@corneliusmith](https://github.com/corneliusmith)
-* Juan Arevalo - [@jparevalo27](https://github.com/jparevalo27)
-* Michael Annucci - [@michael-annucci](https://github.com/michael-annucci)
+```
+backend/
+  _shared/pm_core/   shared library (copied into each service)
+  auth/ users/ projects/ audit/ monitor/ health/   one Lambda each (function.py + requirements.txt)
+  tests/             pytest suite (unit + integration against PostgreSQL)
+frontend/
+  src/               React app (auth/, pages/, components/<feature>/, services/, hooks/, utils/)
+  e2e/               Playwright journeys
+infra/               Terraform (template) + cloudfront.tf SPA routing + scheduler.tf
+bin/                 dev/deploy scripts, sync-shared.sh, smoke-test.sh
+loadtest/            Artillery load test
+docs/                workshop guides (unchanged)
+```
 
-## Feedback
+## Design decisions and trade-offs
 
-We'd love to hear your feedback! Please:
+| Decision | Why | Trade-off |
+|---|---|---|
+| One Lambda per domain + a shared, copied library | Independent deploys and failure isolation, matching the template; no copy-pasted logic | A sync step (`sync-shared.sh`, automated in the scripts) |
+| Requests, approvals, staffing and milestones inside the `projects` service | Approving a request *creates* a project; staffing touches budgets - each must be one transaction | A larger service, split into route modules |
+| Roles re-checked against the database on every request | Role changes and deactivations apply immediately, not when a 15-minute token expires | One extra indexed query per request |
+| Row locks (`FOR NO KEY UPDATE`) for the 40-hour and budget rules | Two simultaneous requests can't both squeeze into the last free hours or dollars (a test proves exactly one wins) | Brief serialisation on the same project/employee |
+| Pending hours are reserved | Approvals can never fail; nobody double-books while a request waits | Reserved capacity until the manager decides |
+| Tokens in `localStorage` | Simple; survives reloads; frontend and API are on different origins locally | Exposed to XSS if one existed - mitigated by 15-min tokens and server-side role checks |
+| 6-character passwords (per brief) | Requirement | Mitigated by PBKDF2 (120k rounds), lockout after 5 failures in 15 min, identical errors for unknown IDs |
+| Polling instead of WebSockets | Lambda function URLs can't hold persistent connections | Up to 30 s latency for others' changes |
+| CloudFront Function for SPA routes | Deep links work; API 404s stay real 404s (the template's global 404→index.html rewrite broke both) | One small infra addition |
+| Vitest instead of Jest | Vite-native, Jest-compatible API (`describe/it/expect`, mocks); React Testing Library as the rubric asks | - |
 
-* ⭐ Star the repository if you find it helpful
-* 🐛 Report issues on GitHub
-* 💡 Suggest improvements
-* 📝 Share your experience
+## Known limitations
+
+- **Hourly budget monitor on AWS:** the workshop's participant role is denied EventBridge and EventBridge Scheduler (`AccessDenied` on `events:ListRules` and `scheduler:ListSchedules`), so the hourly schedule is enabled on LocalStack only. On AWS the same check runs on demand (admin dashboard → *Run budget check now*); set `TF_VAR_aws_monitor_schedule_enabled=true` in an account that allows it.
+- **Aurora Serverless v2 auto-pauses** after idle time; the first request afterwards can take ~15-20 s while it resumes (the connection timeout allows for this).
+- No self-service password change (the brief limits employees to name and email); admins reset passwords.
+- Not a PWA (installable/offline) - deprioritised for time.
+- Holidays aren't modelled in working-day calculations (Mon-Fri, 8 h/day).
+
+---
+
+## License and credits
+
+Licensed under the MIT-0 License - see [LICENSE](./LICENSE). Built on the Citi Coding Workshop template; see [CONTRIBUTING](./CONTRIBUTING.md) and the [workshop guides](./docs/README.md). Template authors: Colin Heilman, Eugene Istrati, Isaiah Cornelius Smith, Juan Arevalo, Michael Annucci.

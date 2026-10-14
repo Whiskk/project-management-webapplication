@@ -52,7 +52,8 @@ scenarios:
           headers:
             Authorization: "Bearer {{ token }}"
       - get:
-          url: "/api/projects?page_size=25"
+          # archived=all so the run works even when the manager's projects are all archived.
+          url: "/api/projects?page_size=25&archived=all"
           headers:
             Authorization: "Bearer {{ token }}"
           capture:
