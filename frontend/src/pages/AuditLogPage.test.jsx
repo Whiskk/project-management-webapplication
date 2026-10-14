@@ -4,7 +4,7 @@ import { Route, Routes } from 'react-router';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError } from '../services/api';
 import { auditApi } from '../services/auditApi';
-import { renderWithProviders } from '../test/render';
+import { TEST_USERS, fakeAuth, renderWithProviders } from '../test/render';
 import AuditLogPage from './AuditLogPage';
 
 const ENTRIES = [
@@ -21,10 +21,10 @@ const ENTRIES = [
   },
 ];
 
-function renderPage(route = '/audit') {
+function renderPage(route = '/audit', user = TEST_USERS.admin) {
   return renderWithProviders(
     <Routes><Route path="/audit" element={<AuditLogPage />} /></Routes>,
-    { route },
+    { route, auth: fakeAuth({ user }) },
   );
 }
 
@@ -34,6 +34,23 @@ beforeEach(() => {
 });
 
 describe('AuditLogPage', () => {
+  it('tells managers their log is limited to themselves and their direct reports', async () => {
+    renderPage('/audit', TEST_USERS.manager);
+    expect(screen.getByText(/Your own activity and your direct reports'/)).toBeInTheDocument();
+    await screen.findByText('Updated project Apollo: budget');
+    await userEvent.click(screen.getByRole('combobox', { name: /^Role/ }));
+    const options = screen.getAllByRole('option').map((option) => option.textContent);
+    expect(options).toEqual(['All roles', 'Manager', 'Employee']);
+  });
+
+  it('offers admins every role in the filter', async () => {
+    renderPage();
+    expect(screen.getByText(/Every change, sign-in and denied attempt/)).toBeInTheDocument();
+    await screen.findByText('Updated project Apollo: budget');
+    await userEvent.click(screen.getByRole('combobox', { name: /^Role/ }));
+    expect(screen.getByRole('option', { name: 'Admin' })).toBeInTheDocument();
+  });
+
   it('lists entries with who, what and outcome', async () => {
     renderPage();
     const table = await screen.findByRole('table', { name: 'Audit log' });

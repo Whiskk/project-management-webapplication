@@ -65,6 +65,7 @@ test.describe('accessibility (axe, WCAG 2.2 AA)', () => {
     await expectAccessible(page, 'manager dashboard');
     await auditPage(page, '/projects', 'My projects');
     await auditPage(page, '/approvals', 'Approvals');
+    await auditPage(page, '/audit', 'Audit log');
     await auditPage(page, '/requests', 'Project requests');
     await page.getByRole('button', { name: 'New request' }).click();
     await expectAccessible(page, 'new request dialog');

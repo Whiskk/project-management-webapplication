@@ -13,6 +13,7 @@ import TablePagination from '@mui/material/TablePagination';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import SearchIcon from '@mui/icons-material/Search';
+import { useAuth } from '../auth/authContext';
 import { ROLE_LABELS } from '../auth/permissions';
 import AuditTable from '../components/audit/AuditTable';
 import useApiResource from '../hooks/useApiResource';
@@ -21,8 +22,15 @@ import { auditApi } from '../services/auditApi';
 
 const EMPTY_FILTERS = { q: '', action: '', role: '', outcome: '', from: '', to: '' };
 
-/** Admin-only, read-only view of every recorded action, with filters. */
+/**
+ * Read-only view of recorded actions, with filters. Admins see everything;
+ * managers see their own and their direct reports' entries (the API enforces it).
+ */
 export default function AuditLogPage() {
+  const { user } = useAuth();
+  const isManager = user.role === 'manager';
+  // A manager's log only ever contains managers (themselves) and employees.
+  const roleOptions = Object.entries(ROLE_LABELS).filter(([value]) => !isManager || value !== 'admin');
   const [searchParams, setSearchParams] = useSearchParams();
   const projectId = searchParams.get('project_id') || '';
   const [filters, setFilters] = useState(EMPTY_FILTERS);
@@ -52,7 +60,10 @@ export default function AuditLogPage() {
       <div>
         <Typography variant="h1">Audit log</Typography>
         <Typography color="text.secondary">
-          Every change, sign-in and denied attempt, newest first. Entries are permanent and cannot be edited or deleted.
+          {isManager
+            ? 'Your own activity and your direct reports\', newest first. Activity by other managers and admins is not shown.'
+            : 'Every change, sign-in and denied attempt, newest first.'}
+          {' '}Entries are permanent and cannot be edited or deleted.
         </Typography>
       </div>
 
@@ -77,7 +88,7 @@ export default function AuditLogPage() {
         <Grid size={{ xs: 6, sm: 3, md: 2.5 }}>
           <TextField select label="Role" value={filters.role} onChange={setFilter('role')} size="small" fullWidth>
             <MenuItem value="">All roles</MenuItem>
-            {Object.entries(ROLE_LABELS).map(([value, label]) => <MenuItem key={value} value={value}>{label}</MenuItem>)}
+            {roleOptions.map(([value, label]) => <MenuItem key={value} value={value}>{label}</MenuItem>)}
           </TextField>
         </Grid>
         <Grid size={{ xs: 6, sm: 3, md: 2.5 }}>

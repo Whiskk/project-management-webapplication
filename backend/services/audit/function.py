@@ -1,5 +1,10 @@
 """
-Audit service: read-only access to the audit log. Admins only.
+Audit service: read-only access to the audit log.
+
+Admins see every entry. Managers see only their own entries, entries made by
+their current direct reports (employees), and failed sign-ins against their own
+or their reports' accounts - never other managers' or admins' activity.
+Employees cannot read the log.
 
 Routes (under /api/audit):
     GET /           filtered, paginated entries, newest first
@@ -26,6 +31,25 @@ from pm_core.validation import parse_choice, parse_id, parse_pagination
 router = Router("audit")
 
 OUTCOMES = ("success", "denied")
+
+# What a manager may see: their own entries, their direct reports' (employees
+# only, so a report later promoted to manager drops out), and failed sign-ins
+# aimed at their own or their reports' accounts (those have no actor).
+MANAGER_SCOPE = """(
+    l.actor_id = %s
+    OR (l.actor_role = 'employee' AND l.actor_id IN (
+        SELECT id FROM users WHERE manager_id = %s AND role = 'employee'))
+    OR (l.action = 'auth.login' AND l.actor_id IS NULL AND l.entity_type = 'user' AND (
+        l.entity_id = %s
+        OR l.entity_id IN (SELECT id FROM users WHERE manager_id = %s AND role = 'employee')))
+)"""
+
+
+def _scope(request: Request) -> tuple[list[sql.Composable], list[Any]]:
+    """Visibility conditions and parameters for the signed-in user (none for admins)."""
+    if request.actor.role == "admin":
+        return [], []
+    return [sql.SQL(MANAGER_SCOPE)], [request.actor.id] * MANAGER_SCOPE.count("%s")
 
 
 def _parse_date(query: dict[str, str], name: str) -> date | None:
@@ -60,9 +84,9 @@ def serialize(row: dict) -> dict:
 
 
 @router.get("/")
-@require_auth("admin")
+@require_auth("admin", "manager")
 def list_entries(request: Request) -> Response:
-    """Search the audit log."""
+    """Search the audit log, limited to what the signed-in user may see."""
     query = request.query
     limit, offset = parse_pagination(query, default_size=50, max_size=200)
     role = parse_choice(query, "role", ROLES)
@@ -71,8 +95,7 @@ def list_entries(request: Request) -> Response:
     if start and end and end < start:
         raise ValidationError({"to": "Must be on or after the 'from' date"})
 
-    conditions: list[sql.Composable] = []
-    params: list[Any] = []
+    conditions, params = _scope(request)
 
     def add(condition: str, *values: Any) -> None:
         conditions.append(sql.SQL(condition))
@@ -113,11 +136,14 @@ def list_entries(request: Request) -> Response:
 
 
 @router.get("/actions")
-@require_auth("admin")
+@require_auth("admin", "manager")
 def list_actions(request: Request) -> Response:
-    """Every action name that has been recorded, for the filter menu."""
+    """Every action name the signed-in user can see, for the filter menu."""
+    conditions, params = _scope(request)
+    where = sql.SQL(" WHERE ") + sql.SQL(" AND ").join(conditions) if conditions else sql.SQL("")
     with transaction() as cur:
-        cur.execute("SELECT DISTINCT action FROM audit_log ORDER BY action")
+        query = sql.SQL("SELECT DISTINCT l.action FROM audit_log l") + where + sql.SQL(" ORDER BY l.action")
+        cur.execute(query, params)
         return ok({"items": [r["action"] for r in cur.fetchall()]})
 
 

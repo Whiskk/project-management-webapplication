@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { signIn, signOut, unknownEmployeeId } from './helpers';
+import { archiveCurrentProject, createProject, signIn, signOut, unique, unknownEmployeeId } from './helpers';
 
 /** Admin: open the audit log filtered by a search term; returns the newest matching row. */
 async function newestAuditRow(page, search) {
@@ -57,4 +57,40 @@ test('failed sign-ins show up in the audit log as denied', async ({ page }) => {
   await page.getByRole('option', { name: 'Denied' }).click();
   const row = await newestAuditRow(page, `Failed sign-in for ${employeeId}`);
   await expect(row.getByText('Denied')).toBeVisible();
+});
+
+test('managers see their own team\'s activity, but never admins\'', async ({ page }) => {
+  const name = unique('Admin only');
+  const newEmail = `eli.mgr.${Date.now().toString(36)}@example.com`;
+
+  // An admin action (creating a project for Morgan) and an employee action (Eli, Morgan's report).
+  await signIn(page, 'admin');
+  const projectUrl = await createProject(page, name);
+  await signOut(page);
+  await signIn(page, 'employee');
+  await page.goto('/profile');
+  const email = page.getByRole('textbox', { name: 'Email' });
+  const originalEmail = await email.inputValue();
+  await email.fill(newEmail);
+  await page.getByRole('button', { name: 'Save changes' }).click();
+  await expect(page.getByText('Profile updated')).toBeVisible();
+  await email.fill(originalEmail);
+  await page.getByRole('button', { name: 'Save changes' }).click();
+  await expect(page.getByText('Profile updated')).toBeVisible();
+  await signOut(page);
+
+  // Morgan sees Eli's change but not the admin creating the project.
+  await signIn(page, 'manager');
+  await page.getByRole('link', { name: 'Audit log' }).click();
+  await expect(page.getByText(/Your own activity and your direct reports'/)).toBeVisible();
+  const row = await newestAuditRow(page, 'Eli Employee updated their profile');
+  await row.getByRole('button', { name: 'Show details' }).click();
+  await expect(page.getByRole('table', { name: 'Field changes' }).first().getByText(newEmail)).toBeVisible();
+  await page.getByLabel('Search').fill(name);
+  await expect(page.getByText('No matching activity.')).toBeVisible();
+  await signOut(page);
+
+  await signIn(page, 'admin');
+  await page.goto(projectUrl);
+  await archiveCurrentProject(page);
 });

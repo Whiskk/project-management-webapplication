@@ -13,7 +13,8 @@ export const ROLE_LABELS = {
 
 const PERMISSIONS = {
   'approvals.review': ['manager'],
-  'audit.view': ['admin'],
+  // Managers see only their own and their direct reports' entries (scoped by the API).
+  'audit.view': ['admin', 'manager'],
   'users.view': ['admin', 'manager'],
   'users.manage': ['admin'],
   'projects.create': ['admin'],

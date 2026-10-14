@@ -149,7 +149,11 @@ check "decided request cannot be decided again" 409 "$(status -X POST -H "$A" -H
 check "archive requested project (cleanup)" 200 "$(status -X POST -H "$A" "$API/projects/$P3/archive")"
 
 echo "[audit log]"
-check "manager cannot read the audit log" 403 "$(status -H "$M" "$API/audit")"
+check "employee cannot read the audit log" 403 "$(status -H "$E" "$API/audit")"
+check "manager can read their scoped log" 200 "$(status -H "$M" "$API/audit")"
+check "manager sees their direct report's activity" True "$(curl -s -m 30 -H "$M" "$API/audit?actor=EE3H9W&action=user.update_self&page_size=5" | json 'd["total"] > 0')"
+check "manager never sees admin entries" 0 "$(curl -s -m 30 -H "$M" "$API/audit?role=admin&page_size=5" | json 'd["total"]')"
+check "manager does not see the admin creating their project" 0 "$(curl -s -m 30 -H "$M" "$API/audit?project_id=$P1&action=project.create" | json 'd["total"]')"
 check "admin sees this run's project in the log" True "$(curl -s -m 30 -H "$A" "$API/audit?project_id=$P1&page_size=200" | json 'any(i["action"] == "project.create" for i in d["items"])')"
 check "denied attempts are recorded" True "$(curl -s -m 30 -H "$A" "$API/audit?outcome=denied&actor=MM4R8T&page_size=5" | json 'd["total"] > 0')"
 check "audit log has no write routes" 405 "$(status -X DELETE -H "$A" "$API/audit")"

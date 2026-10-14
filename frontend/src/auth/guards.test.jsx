@@ -39,12 +39,12 @@ describe('RequireAuth', () => {
 });
 
 describe('RequirePermission', () => {
-  it('allows roles with the permission', () => {
-    renderGuarded({ ...fakeAuth({ user: TEST_USERS.admin }), route: '/audit' });
+  it.each(['admin', 'manager'])('allows %s, who has the permission', (role) => {
+    renderGuarded({ ...fakeAuth({ user: TEST_USERS[role] }), route: '/audit' });
     expect(screen.getByText('Audit page')).toBeInTheDocument();
   });
 
-  it.each(['manager', 'employee'])('shows access denied to %s', (role) => {
+  it.each(['employee'])('shows access denied to %s', (role) => {
     renderGuarded({ ...fakeAuth({ user: TEST_USERS[role] }), route: '/audit' });
     expect(screen.getByRole('heading', { name: 'Access denied' })).toBeInTheDocument();
     expect(screen.queryByText('Audit page')).not.toBeInTheDocument();
