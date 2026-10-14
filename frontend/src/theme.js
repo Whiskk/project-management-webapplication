@@ -1,9 +1,16 @@
 import { alpha, createTheme } from '@mui/material/styles';
 
-// Dark slate surfaces with a soft, muted orange as the accent (dark text on it,
-// so filled buttons stay calm rather than glaring) and a quiet teal secondary.
-const BRAND_ORANGE = '#e0915a';
-const BRAND_TEAL = '#3aa6a8';
+// Dark slate surfaces with a deep green accent. Filled surfaces (buttons, chips)
+// use the deep green with white text (5.3:1); text, links and outlines on the dark
+// background use a lighter green from the same hue (6.5:1). Secondary is a muted steel.
+const GREEN = '#3aaa7a';
+const GREEN_DEEP = '#1f7a52';
+const GREEN_DEEPER = '#1b6b47';
+const STEEL = '#8aa0c2';
+
+// Outlines of inputs and outlined buttons: at least 3:1 against their surface (WCAG 1.4.11).
+const CONTROL_BORDER = '#64748b';
+const CONTROL_BORDER_HOVER = '#8b9bb3';
 
 const surface = {
   base: '#0b1120', // page background
@@ -15,8 +22,8 @@ const surface = {
 const theme = createTheme({
   palette: {
     mode: 'dark',
-    primary: { main: BRAND_ORANGE, light: '#ecb085', dark: '#b8693a', contrastText: '#1a1410' },
-    secondary: { main: BRAND_TEAL, light: '#66c3c4', dark: '#23797b', contrastText: '#0b1418' },
+    primary: { main: GREEN, light: '#6cc79b', dark: GREEN_DEEP, contrastText: '#0b1120' },
+    secondary: { main: STEEL, light: '#a9bad4', dark: '#64799c', contrastText: '#0b1120' },
     error: { main: '#f26d6d' },
     warning: { main: '#f0a24a' },
     success: { main: '#3fbf7f' },
@@ -24,7 +31,7 @@ const theme = createTheme({
     background: { default: surface.base, paper: surface.raised },
     divider: surface.border,
     text: { primary: '#e6ebf3', secondary: '#94a3b8' },
-    action: { hover: 'rgba(148, 163, 184, 0.08)', selected: alpha(BRAND_ORANGE, 0.14) },
+    action: { hover: 'rgba(148, 163, 184, 0.08)', selected: alpha(GREEN, 0.14) },
   },
   // Tighter corners throughout: 4px base, 6px for larger surfaces.
   shape: { borderRadius: 4 },
@@ -82,7 +89,13 @@ const theme = createTheme({
       defaultProps: { disableElevation: true },
       styleOverrides: {
         root: { textTransform: 'none', borderRadius: 4 },
-        outlined: { borderColor: 'rgba(148, 163, 184, 0.3)' },
+        outlined: { borderColor: CONTROL_BORDER },
+        // Filled primary buttons use the deep green with white text.
+        containedPrimary: {
+          backgroundColor: GREEN_DEEP,
+          color: '#ffffff',
+          '&:hover': { backgroundColor: GREEN_DEEPER },
+        },
       },
     },
     MuiIconButton: { styleOverrides: { root: { borderRadius: 4 } } },
@@ -90,11 +103,12 @@ const theme = createTheme({
       styleOverrides: {
         root: {
           backgroundColor: 'rgba(148, 163, 184, 0.04)',
-          '& .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(148, 163, 184, 0.24)' },
-          '&:hover:not(.Mui-disabled, .Mui-error) .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(148, 163, 184, 0.45)' },
+          '& .MuiOutlinedInput-notchedOutline': { borderColor: CONTROL_BORDER },
+          '&:hover:not(.Mui-disabled, .Mui-error) .MuiOutlinedInput-notchedOutline': { borderColor: CONTROL_BORDER_HOVER },
         },
         // Browser autofill paints inputs bright blue; keep them on the dark surface.
         input: {
+          '&::placeholder': { color: '#94a3b8', opacity: 1 },
           '&:-webkit-autofill': {
             WebkitBoxShadow: `0 0 0 100px ${surface.raised} inset`,
             WebkitTextFillColor: '#e6ebf3',
@@ -120,7 +134,12 @@ const theme = createTheme({
     MuiTableRow: {
       styleOverrides: { root: { '&:last-child td': { borderBottom: 0 } } },
     },
-    MuiChip: { styleOverrides: { root: { fontWeight: 500, borderRadius: 4 } } },
+    MuiChip: {
+      styleOverrides: {
+        root: { fontWeight: 500, borderRadius: 4 },
+        filledPrimary: { backgroundColor: GREEN_DEEP, color: '#ffffff' },
+      },
+    },
     // Loading placeholders carry an aria-label ("Loading projects"); the progressbar
     // role makes that label valid and announced. Decorative ones set aria-hidden.
     MuiSkeleton: { defaultProps: { role: 'progressbar' } },

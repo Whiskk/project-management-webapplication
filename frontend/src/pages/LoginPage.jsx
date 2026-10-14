@@ -17,13 +17,7 @@ function validate({ employeeId, password }) {
   return errors;
 }
 
-const FEATURES = [
-  { title: 'Budgets that hold', text: 'Every assignment is costed live against the project budget.' },
-  { title: 'Fair workloads', text: 'Nobody is booked beyond 40 hours a week across projects.' },
-  { title: 'A complete audit trail', text: 'Every change is recorded: who, what and when.' },
-];
-
-/** Left half of the sign-in screen (desktop only): what the product is for. */
+/** Left half of the sign-in screen (desktop only): the product name and what it is for. */
 function ProductPanel() {
   return (
     <Box
@@ -35,13 +29,6 @@ function ProductPanel() {
         borderRight: 1,
         borderColor: 'divider',
         bgcolor: '#0e1627',
-        // A faint grid with a warm glow in the corner.
-        backgroundImage: [
-          'radial-gradient(ellipse 70% 50% at 0% 100%, rgba(224, 145, 90, 0.14), transparent 70%)',
-          'linear-gradient(rgba(148, 163, 184, 0.05) 1px, transparent 1px)',
-          'linear-gradient(90deg, rgba(148, 163, 184, 0.05) 1px, transparent 1px)',
-        ].join(', '),
-        backgroundSize: '100% 100%, 48px 48px, 48px 48px',
       }}
     >
       <Stack direction="row" alignItems="center" spacing={1.25}>
@@ -49,30 +36,14 @@ function ProductPanel() {
         <Typography variant="h6" component="span">Project Hub</Typography>
       </Stack>
 
-      <Box sx={{ maxWidth: 520 }}>
-        <Typography variant="overline" color="primary" sx={{ fontWeight: 600, letterSpacing: '0.12em' }}>
-          Plan · Staff · Deliver
-        </Typography>
-        <Typography component="p" sx={{ fontSize: { md: '2.5rem', lg: '3rem' }, fontWeight: 700, lineHeight: 1.1, letterSpacing: '-0.03em', mt: 1 }}>
+      <Box sx={{ maxWidth: 480 }}>
+        <Typography component="p" sx={{ fontSize: { md: '2.25rem', lg: '2.75rem' }, fontWeight: 700, lineHeight: 1.15, letterSpacing: '-0.025em' }}>
           Project management made easy.
         </Typography>
-        <Typography color="text.secondary" sx={{ mt: 2, fontSize: '1.05rem', maxWidth: 440 }}>
-          Plan milestones, staff your team and keep every budget in check, all in one place.
+        <Typography color="text.secondary" sx={{ mt: 2 }}>
+          Projects, people and budgets in one place.
         </Typography>
-        <Stack component="ul" spacing={2.5} sx={{ listStyle: 'none', p: 0, m: 0, mt: 5 }}>
-          {FEATURES.map((feature) => (
-            <Stack component="li" key={feature.title} direction="row" spacing={2}>
-              <Box sx={{ width: 4, flexShrink: 0, borderRadius: 0.5, bgcolor: 'primary.main' }} />
-              <div>
-                <Typography fontWeight={600}>{feature.title}</Typography>
-                <Typography variant="body2" color="text.secondary">{feature.text}</Typography>
-              </div>
-            </Stack>
-          ))}
-        </Stack>
       </Box>
-
-      <Typography variant="caption" color="text.secondary">Admin · Manager · Employee workspaces</Typography>
     </Box>
   );
 }
