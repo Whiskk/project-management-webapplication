@@ -45,7 +45,7 @@ test.describe('accessibility (axe, WCAG 2.2 AA)', () => {
 
     await page.goto('/projects');
     await page.getByRole('table', { name: 'Projects' }).getByRole('link').first().click();
-    await expect(page.getByRole('heading', { name: 'Team' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Team', exact: true })).toBeVisible();
     await expectAccessible(page, 'project detail');
 
     await page.goto('/projects');
