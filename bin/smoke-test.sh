@@ -133,6 +133,20 @@ check "then work can start" 200 "$(status -X PATCH -H "$M" -H "$J" -d '{"status"
 check "progress is tracked" 50 "$(curl -s -m 30 -H "$M" "$API/projects/$P1/milestones" | json 'd["summary"]["percent_complete"]')"
 check "cannot delete a milestone others depend on" 409 "$(status -X DELETE -H "$M" "$API/projects/$P1/milestones/$M1")"
 
+echo "[project requests]"
+req() { curl -s -m 30 -X POST -H "$M" -H "$J" -d "{\"name\":\"$1\",\"start_date\":\"2031-04-07\",\"predicted_end_date\":\"2031-04-18\",\"budget\":5000,\"justification\":\"smoke test\"}" "$API/projects/requests" | json 'd["id"]'; }
+R1=$(req "Smoke test request (safe to ignore)")
+R2=$(req "Smoke test withdrawn request (safe to ignore)")
+check "manager submits requests" yes "$([ -n "$R1" ] && [ -n "$R2" ] && echo yes || echo no)"
+check "admin cannot submit" 403 "$(status -X POST -H "$A" -H "$J" -d '{}' "$API/projects/requests")"
+check "manager cannot approve" 403 "$(status -X POST -H "$M" -H "$J" -d '{}' "$API/projects/requests/$R1/approve")"
+check "rejection needs a reason" 400 "$(status -X POST -H "$A" -H "$J" -d '{}' "$API/projects/requests/$R1/reject")"
+check "manager withdraws own request" withdrawn "$(curl -s -m 30 -X POST -H "$M" "$API/projects/requests/$R2/withdraw" | json 'd["status"]')"
+P3=$(curl -s -m 30 -X POST -H "$A" -H "$J" -d '{"budget":4000}' "$API/projects/requests/$R1/approve" | json 'd["project_id"]')
+check "approval creates the project" 4000.0 "$(curl -s -m 30 -H "$M" "$API/projects/$P3" | json 'd["budget"]')"
+check "decided request cannot be decided again" 409 "$(status -X POST -H "$A" -H "$J" -d '{"note":"x"}' "$API/projects/requests/$R1/reject")"
+check "archive requested project (cleanup)" 200 "$(status -X POST -H "$A" "$API/projects/$P3/archive")"
+
 echo "[cleanup]"
 for pair in "$P1:$A1" "$P2:$A2"; do
     check "remove assignment ${pair#*:}" 204 "$(status -X DELETE -H "$A" "$API/projects/${pair%%:*}/assignments/${pair#*:}")"

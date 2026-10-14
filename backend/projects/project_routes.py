@@ -62,6 +62,36 @@ def check_dates(start: Any, end: Any) -> None:
         raise ValidationError({"predicted_end_date": "Must be on or after the start date"})
 
 
+def insert_project(cur: psycopg.Cursor, actor: Actor, data: dict, source: str = "") -> dict:
+    """
+    Create a project from validated data and audit it (caller owns the transaction).
+
+    Shared by "New project" and approving a project request, so both follow
+    exactly the same rules. ``source`` is appended to the audit summary.
+    """
+    check_dates(data["start_date"], data["predicted_end_date"])
+    check_manager(cur, data["manager_id"])
+    cur.execute(
+        """
+        INSERT INTO projects (name, description, start_date, predicted_end_date,
+                              manager_id, budget, status, created_by)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+        RETURNING id
+        """,
+        (
+            data["name"], data.get("description", ""), data["start_date"], data["predicted_end_date"],
+            data["manager_id"], data["budget"], data.get("status", "planned"), actor.id,
+        ),
+    )
+    row = fetch_visible_project(cur, actor, cur.fetchone()["id"])
+    audit.record(
+        cur, actor, "project.create", "project", row["id"],
+        f"Created project {row['name']} (manager: {row['manager_name']}){source}",
+        after=audit_view(row), project_id=row["id"],
+    )
+    return row
+
+
 def register(router: Router) -> None:
     """Attach the project routes to the service router."""
 
@@ -112,28 +142,9 @@ def register(router: Router) -> None:
         data = validate(request.body, ADMIN_FIELDS)
         data.setdefault("description", "")
         data.setdefault("status", "planned")
-        check_dates(data["start_date"], data["predicted_end_date"])
         actor = request.actor
         with transaction() as cur:
-            check_manager(cur, data["manager_id"])
-            cur.execute(
-                """
-                INSERT INTO projects (name, description, start_date, predicted_end_date,
-                                      manager_id, budget, status, created_by)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-                RETURNING id
-                """,
-                (
-                    data["name"], data["description"], data["start_date"], data["predicted_end_date"],
-                    data["manager_id"], data["budget"], data["status"], actor.id,
-                ),
-            )
-            row = fetch_visible_project(cur, actor, cur.fetchone()["id"])
-            audit.record(
-                cur, actor, "project.create", "project", row["id"],
-                f"Created project {row['name']} (manager: {row['manager_name']})",
-                after=audit_view(row), project_id=row["id"],
-            )
+            row = insert_project(cur, actor, data)
         return created(serialize(row, actor))
 
     @router.get("/{id}")

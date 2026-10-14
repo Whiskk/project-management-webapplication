@@ -16,11 +16,13 @@ import AccountCircleIcon from '@mui/icons-material/AccountCircle';
 import AssignmentTurnedInIcon from '@mui/icons-material/AssignmentTurnedIn';
 import DashboardIcon from '@mui/icons-material/Dashboard';
 import FolderIcon from '@mui/icons-material/Folder';
+import InboxIcon from '@mui/icons-material/Inbox';
 import MenuIcon from '@mui/icons-material/Menu';
 import PeopleIcon from '@mui/icons-material/People';
 import { useAuth } from '../../auth/authContext';
 import { can } from '../../auth/permissions';
 import { useApprovalCount } from '../../services/approvalCount';
+import { useRequestCount } from '../../services/requestCount';
 import UserMenu from './UserMenu';
 
 const DRAWER_WIDTH = 240;
@@ -30,6 +32,7 @@ const NAV_ITEMS = [
   { to: '/', label: 'Dashboard', icon: <DashboardIcon /> },
   { to: '/projects', label: 'Projects', icon: <FolderIcon /> },
   { to: '/approvals', label: 'Approvals', icon: <AssignmentTurnedInIcon />, permission: 'approvals.review', badge: 'approvals' },
+  { to: '/requests', label: 'Requests', icon: <InboxIcon />, permission: 'requests.view', badge: 'requests' },
   { to: '/users', label: 'Users', icon: <PeopleIcon />, permission: 'users.view' },
   { to: '/profile', label: 'My profile', icon: <AccountCircleIcon /> },
 ];
@@ -40,6 +43,8 @@ export default function AppShell() {
   const location = useLocation();
   // Refreshed on every navigation so the badge stays current without polling.
   const approvalCount = useApprovalCount(can(user, 'approvals.review'), location.key);
+  const requestCount = useRequestCount(can(user, 'requests.review'), location.key);
+  const badges = { approvals: approvalCount, requests: requestCount };
   const isDesktop = useMediaQuery({ minWidth: 900 });
   const [mobileOpen, setMobileOpen] = useState(false);
   const visibleItems = NAV_ITEMS.filter((item) => !item.permission || can(user, item.permission));
@@ -58,8 +63,8 @@ export default function AppShell() {
             sx={{ '&.active': { bgcolor: 'action.selected', fontWeight: 600 } }}
           >
             <ListItemIcon>
-              {item.badge === 'approvals' ? (
-                <Badge badgeContent={approvalCount} color="error" aria-label={`${approvalCount} awaiting approval`}>
+              {item.badge && badges[item.badge] > 0 ? (
+                <Badge badgeContent={badges[item.badge]} color="error" aria-label={`${badges[item.badge]} awaiting ${item.badge === 'approvals' ? 'approval' : 'review'}`}>
                   {item.icon}
                 </Badge>
               ) : item.icon}

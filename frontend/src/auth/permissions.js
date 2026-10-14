@@ -19,6 +19,7 @@ const PERMISSIONS = {
   'projects.create': ['admin'],
   'projects.archive': ['admin'],
   'projects.manage': ['admin', 'manager'],
+  'requests.view': ['admin', 'manager'],
   'requests.create': ['manager'],
   'requests.review': ['admin'],
 };

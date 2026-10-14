@@ -9,6 +9,7 @@ import NotFoundPage from './pages/NotFoundPage';
 import ProfilePage from './pages/ProfilePage';
 import ProjectDetailPage from './pages/ProjectDetailPage';
 import ProjectsPage from './pages/ProjectsPage';
+import RequestsPage from './pages/RequestsPage';
 import UsersPage from './pages/UsersPage';
 
 export default function App() {
@@ -23,6 +24,9 @@ export default function App() {
           <Route path="projects/:projectId" element={<ProjectDetailPage />} />
           <Route element={<RequirePermission permission="approvals.review" />}>
             <Route path="approvals" element={<ApprovalsPage />} />
+          </Route>
+          <Route element={<RequirePermission permission="requests.view" />}>
+            <Route path="requests" element={<RequestsPage />} />
           </Route>
           <Route element={<RequirePermission permission="users.view" />}>
             <Route path="users" element={<UsersPage />} />

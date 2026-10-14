@@ -177,6 +177,17 @@ MIGRATIONS: list[tuple[int, str]] = [
             WHERE status = 'pending' OR pending_hours IS NOT NULL;
         """,
     ),
+    (
+        3,
+        # Project requests: managers can withdraw their own pending requests.
+        """
+        ALTER TABLE project_requests DROP CONSTRAINT project_requests_status_check;
+        ALTER TABLE project_requests
+            ADD CONSTRAINT project_requests_status_check
+                CHECK (status IN ('pending', 'approved', 'rejected', 'withdrawn'));
+        CREATE INDEX project_requests_status_idx ON project_requests (status, created_at);
+        """,
+    ),
 ]
 
 # Demo accounts created on an empty database.
