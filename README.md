@@ -93,8 +93,8 @@ After editing backend code, run `./bin/build-backend.sh` (about a second); Local
 cd backend && python3 -m venv .venv && .venv/bin/pip install -r requirements-dev.txt
 .venv/bin/pytest                      # 335 unit + integration tests (uses a separate pm_test database)
 .venv/bin/ruff check . && .venv/bin/ruff format --check .
-cd ../frontend && npm test            # 133 component/service tests (Vitest + React Testing Library)
-npm run lint && npm run e2e           # ESLint; 18 Playwright end-to-end journeys against the running app
+cd ../frontend && npm test            # 147 component/service tests (Vitest + React Testing Library)
+npm run lint && npm run e2e           # ESLint; 18 Playwright journeys + 5 axe accessibility scans
 cd .. && ./bin/smoke-test.sh          # 62 live API checks (local by default, or pass a URL)
 ```
 

@@ -8,13 +8,14 @@ Results below are from **14 October 2026**, against commit `a99f17d` (local) and
 | Layer | Tool | Tests | Result | Coverage |
 |---|---|---|---|---|
 | Backend unit + integration | pytest (+ pytest-cov) against a real PostgreSQL `pm_test` database | **335** | ✅ all pass | **98%** of backend code (1,994 statements, 37 uncovered) |
-| Frontend components + services | Vitest + React Testing Library | **133** | ✅ all pass | **90.6% lines**, 89.3% statements, 85.4% branches, 80.0% functions |
+| Frontend components + services | Vitest + React Testing Library | **147** | ✅ all pass | **91.7% lines**, 90.2% statements, 85.5% branches, 82.9% functions |
 | End-to-end (browser) | Playwright (Chromium desktop + Pixel 7 mobile) | **18 journeys** | ✅ all pass **locally and on AWS** | all critical user paths (below) |
+| Accessibility | axe-core in Playwright, WCAG 2.0/2.1/2.2 A and AA | **5 scans, 20+ screens** | ✅ no violations | every page for every role, key dialogs, error states, phone menu |
 | Live API smoke test | `bin/smoke-test.sh` (curl) | **62 checks** | ✅ 62/62 **locally and on AWS** | every service and business rule |
 | Load | Artillery | 700 virtual users, 4,200 requests | ✅ 0 errors on AWS | see [Performance](#performance) |
 | Static analysis | ruff (Python), ESLint (JS), bandit (security), npm audit | - | ✅ all clean | - |
 
-Rubric targets (`docs/full-stack.md`): backend ≥ 80% ✅ (98%), frontend ≥ 80% ✅ (90.6% lines, 80% functions; see [Known gaps](#known-gaps)), API endpoints ≥ 90% ✅, error handling ≥ 90% ✅, critical paths 100% E2E ✅.
+Rubric targets (`docs/full-stack.md`): backend ≥ 80% ✅ (98%), frontend ≥ 80% ✅ (91.7% lines, 82.9% functions), API endpoints ≥ 90% ✅, error handling ≥ 90% ✅, critical paths 100% E2E ✅.
 
 ## How to run
 
@@ -72,6 +73,7 @@ Every service is tested by calling its real Lambda `handler()` with Function URL
 Vitest is used instead of Jest: it is Vite's native runner with a Jest-compatible API (`describe`/`it`/`expect`/mocks), and React Testing Library is used as the rubric asks.
 
 - **API client:** success, 204, error shape, network errors, the CloudFront HTML fallback, token refresh and retry, single shared refresh, session expiry.
+- **API service functions** (mocked responses): every users and audit call sends the right method, URL, query string and body, passes abort signals through, and turns error responses into typed errors.
 - **Auth:** login form validation and errors, session restore, sign-out, route guards and permission guards.
 - **Pages and components:** users, projects, project detail (budget card, insights, archive/reactivate), team and assignment dialog (live cost/availability preview, approval note), milestones timeline and dialog, approvals, requests, audit log, role dashboards, badges and polling.
 
@@ -101,6 +103,14 @@ Run in real Chromium against the running app and backend; each run creates uniqu
 | Mobile layout (Pixel 7) | Slide-out navigation |
 
 **Result:** 18/18 locally (≈2.3 min) and 18/18 against AWS.
+
+### Accessibility (axe)
+
+`e2e/accessibility.e2e.js` runs [axe-core](https://github.com/dequelabs/axe-core) against WCAG 2.0, 2.1 and 2.2 at levels A and AA on the sign-in page (with and without validation errors), every page for each role, the audit log with an entry expanded, project detail, the new project/user/request dialogs (with errors), and the phone layout with the menu open. A failure lists each rule and the offending elements.
+
+The first scan found two real issues, both fixed: sidebar links were direct children of a list (now wrapped in list items), and loading placeholders had a label but no role (now `progressbar`). Colour contrast passes in the dark theme.
+
+**Result:** 5/5, no violations; the full Playwright suite is 23/23 locally.
 
 To watch the journeys run (e.g. for a demo), from `frontend/`: `npx playwright test --ui` (pick and replay tests step by step), or `npx playwright test --headed --project=desktop` (a real browser window).
 
@@ -136,8 +146,8 @@ Run against the deployed app after each release (the smoke test automates the AP
 
 ## Known gaps
 
-- **Frontend function coverage is exactly 80%** (lines 90.6%). The uncovered functions are mostly small inline event handlers (dialog cancel buttons, menu close handlers) whose behaviour is exercised by the E2E suite. The thin API wrappers `usersApi.js` (11%) and `auditApi.js` (33%) are replaced by fakes in page tests, so they have no direct unit tests; their calls are covered end to end.
+- **Frontend function coverage is 82.9%** (lines 91.7%). The uncovered functions are mostly small inline event handlers (dialog cancel buttons, menu close handlers) whose behaviour is exercised by the E2E suite.
 - **The 2% of backend code not covered** is defensive handling of failures that are hard to provoke locally: resetting a dropped database connection, the cloud-only SSL setting, an audit write that itself fails, and a few rarely used filter branches.
 - **The hourly budget-monitor schedule is only exercised on LocalStack.** On AWS the participant role is denied EventBridge (see README → Known limitations); the on-demand trigger is tested on both.
 - **Load testing used one demo manager account** for all virtual users (realistic per-request cost, but not many distinct users' data).
-- Accessibility was checked through semantic roles and labels (every E2E and component test locates elements by role/label, as assistive technology does) rather than a dedicated audit tool such as axe.
+- **Automated accessibility checks catch roughly half of WCAG issues.** axe covers contrast, names, roles and structure; keyboard-only and screen-reader walkthroughs were not done as a formal audit.

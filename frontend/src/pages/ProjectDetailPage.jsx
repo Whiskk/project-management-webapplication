@@ -85,7 +85,7 @@ export default function ProjectDetailPage() {
     return (
       <Stack spacing={2}>
         <Skeleton variant="text" width={280} height={48} aria-label="Loading project" />
-        <Skeleton variant="rounded" height={120} />
+        <Skeleton variant="rounded" height={120} aria-hidden />
       </Stack>
     );
   }

@@ -24,6 +24,8 @@ export default defineConfig({
     // Ignore the API URL from a generated .env.local so tests are deterministic.
     env: { VITE_API_URL: '' },
     css: false,
+    // Form tests type character by character; allow for a busy machine (e.g. E2E running alongside).
+    testTimeout: 15_000,
     // Playwright end-to-end tests live in e2e/ and run separately (npm run e2e).
     exclude: ['**/node_modules/**', 'e2e/**'],
     coverage: {

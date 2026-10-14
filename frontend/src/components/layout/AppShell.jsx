@@ -8,6 +8,7 @@ import CircularProgress from '@mui/material/CircularProgress';
 import Drawer from '@mui/material/Drawer';
 import IconButton from '@mui/material/IconButton';
 import List from '@mui/material/List';
+import ListItem from '@mui/material/ListItem';
 import ListItemButton from '@mui/material/ListItemButton';
 import ListItemIcon from '@mui/material/ListItemIcon';
 import ListItemText from '@mui/material/ListItemText';
@@ -58,33 +59,34 @@ export default function AppShell() {
       <Toolbar />
       <List sx={{ px: 1.5, py: 2, display: 'grid', gap: 0.5 }}>
         {visibleItems.map((item) => (
-          <ListItemButton
-            key={item.to}
-            component={NavLink}
-            to={item.to}
-            end={item.to === '/'}
-            onClick={() => setMobileOpen(false)}
-            sx={{
-              py: 1,
-              color: 'text.secondary',
-              '& .MuiListItemText-primary': { fontSize: '0.9rem', fontWeight: 500 },
-              '&:hover': { color: 'text.primary' },
-              '&.active': {
-                bgcolor: 'action.selected',
-                color: 'primary.light',
-                '& .MuiListItemText-primary': { fontWeight: 600 },
-              },
-            }}
-          >
-            <ListItemIcon sx={{ minWidth: 40, color: 'inherit' }}>
-              {item.badge && badges[item.badge] > 0 ? (
-                <Badge badgeContent={badges[item.badge]} color="error" aria-label={`${badges[item.badge]} awaiting ${item.badge === 'approvals' ? 'approval' : 'review'}`}>
-                  {item.icon}
-                </Badge>
-              ) : item.icon}
-            </ListItemIcon>
-            <ListItemText primary={item.label} />
-          </ListItemButton>
+          <ListItem key={item.to} disablePadding>
+            <ListItemButton
+              component={NavLink}
+              to={item.to}
+              end={item.to === '/'}
+              onClick={() => setMobileOpen(false)}
+              sx={{
+                py: 1,
+                color: 'text.secondary',
+                '& .MuiListItemText-primary': { fontSize: '0.9rem', fontWeight: 500 },
+                '&:hover': { color: 'text.primary' },
+                '&.active': {
+                  bgcolor: 'action.selected',
+                  color: 'primary.light',
+                  '& .MuiListItemText-primary': { fontWeight: 600 },
+                },
+              }}
+            >
+              <ListItemIcon sx={{ minWidth: 40, color: 'inherit' }}>
+                {item.badge && badges[item.badge] > 0 ? (
+                  <Badge badgeContent={badges[item.badge]} color="error" aria-label={`${badges[item.badge]} awaiting ${item.badge === 'approvals' ? 'approval' : 'review'}`}>
+                    {item.icon}
+                  </Badge>
+                ) : item.icon}
+              </ListItemIcon>
+              <ListItemText primary={item.label} />
+            </ListItemButton>
+          </ListItem>
         ))}
       </List>
     </Box>

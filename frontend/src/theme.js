@@ -121,6 +121,9 @@ const theme = createTheme({
       styleOverrides: { root: { '&:last-child td': { borderBottom: 0 } } },
     },
     MuiChip: { styleOverrides: { root: { fontWeight: 500, borderRadius: 4 } } },
+    // Loading placeholders carry an aria-label ("Loading projects"); the progressbar
+    // role makes that label valid and announced. Decorative ones set aria-hidden.
+    MuiSkeleton: { defaultProps: { role: 'progressbar' } },
     MuiTabs: {
       styleOverrides: { root: { borderBottom: `1px solid ${surface.border}` } },
     },
