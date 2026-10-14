@@ -145,7 +145,7 @@ export default function AssignmentDialog({ project, assignment, onClose, onSaved
                   p: 2,
                   borderRadius: 1,
                   border: 1,
-                  bgcolor: (theme) => (overBudget ? alpha(theme.palette.error.main, 0.06) : theme.palette.grey[50]),
+                  bgcolor: (theme) => (overBudget ? alpha(theme.palette.error.main, 0.06) : theme.palette.action.hover),
                   borderColor: overBudget ? 'error.light' : 'divider',
                 }}
               >

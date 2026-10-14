@@ -30,7 +30,7 @@ export default function PasswordDialog({ credentials, onClose }) {
         <Typography gutterBottom>
           Share these sign-in details with <strong>{credentials.name}</strong>:
         </Typography>
-        <Box sx={{ my: 2, p: 2, bgcolor: 'grey.100', borderRadius: 1, fontFamily: 'monospace', fontSize: 18 }}>
+        <Box sx={{ my: 2, p: 2, bgcolor: 'action.hover', border: 1, borderColor: 'divider', borderRadius: 1, fontFamily: 'monospace', fontSize: 18 }}>
           <div>Employee ID: {credentials.employeeId}</div>
           <div>
             Password: <span data-testid="temporary-password">{credentials.password}</span>

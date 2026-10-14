@@ -38,7 +38,7 @@ export default function UserMenu({ compact = false }) {
             </Typography>
           </Box>
         )}
-        <Avatar sx={{ width: 34, height: 34, bgcolor: 'secondary.main', fontSize: 14 }}>{initials}</Avatar>
+        <Avatar sx={{ width: 34, height: 34, bgcolor: 'secondary.main', color: 'secondary.contrastText', fontSize: 14, fontWeight: 600 }}>{initials}</Avatar>
       </ButtonBase>
       <Menu
         anchorEl={anchor}

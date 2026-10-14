@@ -25,7 +25,7 @@ import { MILESTONE_STATUSES } from './milestoneStatuses';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const toDay = (iso) => Date.parse(`${iso.slice(0, 10)}T00:00:00Z`) / DAY_MS;
-const BAR_COLORS = { not_started: 'grey.400', in_progress: 'primary.main', completed: 'success.main', blocked: 'error.main' };
+const BAR_COLORS = { not_started: 'grey.600', in_progress: 'primary.main', completed: 'success.main', blocked: 'error.main' };
 
 /** Position (percent) of a date range within the timeline window. */
 function barPosition(start, due, windowStart, windowDays) {
@@ -162,7 +162,7 @@ export default function MilestonesSection({ project, canEdit, onChanged }) {
                 </div>
 
                 {isWide && (
-                  <Box sx={{ position: 'relative', height: 20, bgcolor: 'grey.100', borderRadius: 1 }} aria-hidden>
+                  <Box sx={{ position: 'relative', height: 20, bgcolor: 'action.hover', borderRadius: 1 }} aria-hidden>
                     <Box sx={{ position: 'absolute', left: `${endMarker}%`, top: -4, bottom: -4, borderLeft: 1, borderColor: 'text.disabled', borderStyle: 'dashed' }} />
                     {todayInWindow && (
                       <Box sx={{ position: 'absolute', left: `${((today - windowStart) / windowDays) * 100}%`, top: -4, bottom: -4, borderLeft: 2, borderColor: 'secondary.main' }} />

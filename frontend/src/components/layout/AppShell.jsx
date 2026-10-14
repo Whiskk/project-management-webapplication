@@ -25,6 +25,7 @@ import { useAuth } from '../../auth/authContext';
 import { can } from '../../auth/permissions';
 import { useApprovalCount } from '../../services/approvalCount';
 import { useRequestCount } from '../../services/requestCount';
+import BrandMark from './BrandMark';
 import UserMenu from './UserMenu';
 
 const DRAWER_WIDTH = 240;
@@ -55,7 +56,7 @@ export default function AppShell() {
   const navigation = (
     <Box component="nav" aria-label="Main navigation">
       <Toolbar />
-      <List>
+      <List sx={{ px: 1.5, py: 2, display: 'grid', gap: 0.5 }}>
         {visibleItems.map((item) => (
           <ListItemButton
             key={item.to}
@@ -63,9 +64,19 @@ export default function AppShell() {
             to={item.to}
             end={item.to === '/'}
             onClick={() => setMobileOpen(false)}
-            sx={{ '&.active': { bgcolor: 'action.selected', fontWeight: 600 } }}
+            sx={{
+              py: 1,
+              color: 'text.secondary',
+              '& .MuiListItemText-primary': { fontSize: '0.9rem', fontWeight: 500 },
+              '&:hover': { color: 'text.primary' },
+              '&.active': {
+                bgcolor: 'action.selected',
+                color: 'primary.light',
+                '& .MuiListItemText-primary': { fontWeight: 600 },
+              },
+            }}
           >
-            <ListItemIcon>
+            <ListItemIcon sx={{ minWidth: 40, color: 'inherit' }}>
               {item.badge && badges[item.badge] > 0 ? (
                 <Badge badgeContent={badges[item.badge]} color="error" aria-label={`${badges[item.badge]} awaiting ${item.badge === 'approvals' ? 'approval' : 'review'}`}>
                   {item.icon}
@@ -88,9 +99,12 @@ export default function AppShell() {
               <MenuIcon />
             </IconButton>
           )}
-          <Typography variant="h6" component="span" noWrap sx={{ flexGrow: 1 }}>
-            Project Hub
-          </Typography>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25, flexGrow: 1, minWidth: 0 }}>
+            <BrandMark />
+            <Typography variant="h6" component="span" noWrap>
+              Project Hub
+            </Typography>
+          </Box>
           <UserMenu compact={!isDesktop} />
         </Toolbar>
       </AppBar>
@@ -105,18 +119,20 @@ export default function AppShell() {
         {navigation}
       </Drawer>
 
-      <Box component="main" sx={{ flexGrow: 1, minWidth: 0, p: { xs: 2, md: 3 } }}>
+      <Box component="main" sx={{ flexGrow: 1, minWidth: 0, p: { xs: 2, md: 4 } }}>
         <Toolbar />
-        {/* Lazy-loaded pages: only the content area waits, the navigation stays. */}
-        <Suspense
-          fallback={(
-            <Box sx={{ display: 'grid', placeItems: 'center', py: 8 }}>
-              <CircularProgress aria-label="Loading page" />
-            </Box>
-          )}
-        >
-          <Outlet />
-        </Suspense>
+        <Box sx={{ maxWidth: 1400, mx: 'auto' }}>
+          {/* Lazy-loaded pages: only the content area waits, the navigation stays. */}
+          <Suspense
+            fallback={(
+              <Box sx={{ display: 'grid', placeItems: 'center', py: 8 }}>
+                <CircularProgress aria-label="Loading page" />
+              </Box>
+            )}
+          >
+            <Outlet />
+          </Suspense>
+        </Box>
       </Box>
     </Box>
   );

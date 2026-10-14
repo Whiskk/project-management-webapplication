@@ -70,9 +70,12 @@ export default function ChangePasswordForm({ currentLabel = 'Current password', 
   });
 
   return (
-    <Stack component="form" spacing={2} onSubmit={handleSubmit} noValidate>
+    // pt: room for the first field's floating label below a heading.
+    // autoComplete "new-password" on every field: browsers must not pre-fill a
+    // saved password here; the user has to type their current one deliberately.
+    <Stack component="form" spacing={2} onSubmit={handleSubmit} noValidate autoComplete="off" sx={{ pt: 1 }}>
       {submitError && <Alert severity="error">{submitError}</Alert>}
-      <TextField label={currentLabel} autoComplete="current-password" {...fieldProps('current_password')} />
+      <TextField label={currentLabel} autoComplete="new-password" {...fieldProps('current_password')} />
       <TextField label="New password" autoComplete="new-password" {...fieldProps('new_password')} />
       <TextField label="Confirm new password" autoComplete="new-password" {...fieldProps('confirm')} />
       <Typography variant="body2" color="text.secondary">

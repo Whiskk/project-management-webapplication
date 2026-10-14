@@ -88,7 +88,7 @@ export default function AuditTable({ entries, showProject = true, emptyText = 'N
             const expanded = open.has(entry.id);
             return (
               <Fragment key={entry.id}>
-                <TableRow hover sx={entry.outcome === 'denied' ? { bgcolor: (theme) => alpha(theme.palette.error.main, 0.05) } : undefined}>
+                <TableRow hover sx={entry.outcome === 'denied' ? { bgcolor: (theme) => alpha(theme.palette.error.main, 0.08) } : undefined}>
                   <TableCell padding="checkbox">
                     <IconButton size="small" aria-label={expanded ? 'Hide details' : 'Show details'} aria-expanded={expanded} onClick={() => toggle(entry.id)}>
                       {expanded ? <KeyboardArrowUpIcon fontSize="small" /> : <KeyboardArrowDownIcon fontSize="small" />}

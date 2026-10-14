@@ -9,6 +9,7 @@ import CircularProgress from '@mui/material/CircularProgress';
 import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
+import BrandMark from '../components/layout/BrandMark';
 import { useAuth } from '../auth/authContext';
 
 function validate({ employeeId, password }) {
@@ -53,12 +54,13 @@ export default function LoginPage() {
   };
 
   return (
-    <Box sx={{ minHeight: '100vh', display: 'grid', placeItems: 'center', p: 2, bgcolor: 'background.default' }}>
-      <Card sx={{ width: '100%', maxWidth: 400 }}>
+    <Box sx={{ minHeight: '100vh', display: 'grid', placeItems: 'center', p: 2, bgcolor: 'background.default', backgroundImage: 'radial-gradient(ellipse 80% 60% at 50% -10%, rgba(76, 142, 224, 0.22), transparent 70%), radial-gradient(ellipse 50% 40% at 90% 110%, rgba(43, 179, 181, 0.12), transparent 70%)' }}>
+      <Card sx={{ width: '100%', maxWidth: 420, boxShadow: '0 24px 64px rgba(0, 0, 0, 0.45)' }}>
         <CardContent sx={{ p: { xs: 3, sm: 4 } }}>
           <Stack component="form" spacing={2.5} onSubmit={handleSubmit} noValidate>
             <div>
-              <Typography variant="h1" gutterBottom>
+              <BrandMark size={40} />
+              <Typography variant="h1" gutterBottom sx={{ mt: 2 }}>
                 Project Hub
               </Typography>
               <Typography color="text.secondary">Sign in with your employee ID.</Typography>

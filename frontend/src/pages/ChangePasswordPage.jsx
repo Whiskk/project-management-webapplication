@@ -7,6 +7,7 @@ import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import { useAuth } from '../auth/authContext';
 import ChangePasswordForm from '../components/auth/ChangePasswordForm';
+import BrandMark from '../components/layout/BrandMark';
 import { useNotify } from '../components/feedback/notificationContext';
 
 /**
@@ -22,12 +23,13 @@ export default function ChangePasswordPage() {
   if (!user?.must_change_password) return <Navigate to="/" replace />;
 
   return (
-    <Box sx={{ minHeight: '100vh', display: 'grid', placeItems: 'center', p: 2, bgcolor: 'background.default' }}>
-      <Card sx={{ width: '100%', maxWidth: 440 }}>
+    <Box sx={{ minHeight: '100vh', display: 'grid', placeItems: 'center', p: 2, bgcolor: 'background.default', backgroundImage: 'radial-gradient(ellipse 80% 60% at 50% -10%, rgba(76, 142, 224, 0.22), transparent 70%), radial-gradient(ellipse 50% 40% at 90% 110%, rgba(43, 179, 181, 0.12), transparent 70%)' }}>
+      <Card sx={{ width: '100%', maxWidth: 440, boxShadow: '0 24px 64px rgba(0, 0, 0, 0.45)' }}>
         <CardContent sx={{ p: { xs: 3, sm: 4 } }}>
           <Stack spacing={2.5}>
             <div>
-              <Typography variant="h1" gutterBottom>Choose a new password</Typography>
+              <BrandMark size={40} />
+              <Typography variant="h1" gutterBottom sx={{ mt: 2 }}>Choose a new password</Typography>
               <Typography color="text.secondary">
                 Welcome, {user.first_name}. You signed in with a temporary password from an administrator.
                 Choose your own password to continue.
