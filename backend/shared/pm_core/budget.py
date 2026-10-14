@@ -77,8 +77,9 @@ def projected_cost(
     )
 
 
-def check_within_budget(new_cost: Decimal, budget: Decimal, old_cost: Decimal | None = None,
-                        old_budget: Decimal | None = None) -> None:
+def check_within_budget(
+    new_cost: Decimal, budget: Decimal, old_cost: Decimal | None = None, old_budget: Decimal | None = None
+) -> None:
     """
     Raise 409 if a change leaves the project over budget *and* made things worse.
 

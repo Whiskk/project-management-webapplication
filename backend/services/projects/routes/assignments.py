@@ -13,7 +13,7 @@ projected labour cost within the project budget.
 Cross-team approval: when the person staffing an employee is not that
 employee's own manager (admins included), new assignments and hour
 *increases* are created as pending requests for the employee's manager to
-approve (see approval_routes). Pending hours are reserved - they already count
+approve (see routes/approvals.py). Pending hours are reserved - they already count
 towards both rules - so approving can never break them. Reductions and
 removals always apply immediately.
 """
@@ -31,7 +31,7 @@ from pm_core.db import transaction
 from pm_core.errors import Conflict, NotFound, ValidationError
 from pm_core.http import Request, Response, Router, created, no_content, ok
 from pm_core.validation import Field, parse_id, validate
-from project_queries import fetch_project_for_write, fetch_visible_project
+from queries import fetch_project_for_write, fetch_visible_project
 
 HOURS_FIELD = Field("decimal", min_value=Decimal("0.5"), max_value=capacity.MAX_WEEKLY_HOURS)
 CREATE_SPEC = {"user_id": Field("int", min_value=1), "hours_per_week": HOURS_FIELD}

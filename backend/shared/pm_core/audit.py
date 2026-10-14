@@ -142,8 +142,15 @@ def record_denied(
     try:
         with db.independent_transaction() as cur:
             record(
-                cur, actor, action, entity_type, entity_id, summary,
-                project_id=project_id, outcome="denied", actor_employee_id=actor_employee_id,
+                cur,
+                actor,
+                action,
+                entity_type,
+                entity_id,
+                summary,
+                project_id=project_id,
+                outcome="denied",
+                actor_employee_id=actor_employee_id,
             )
     except psycopg.Error:
         # The request is still refused; losing this one audit entry must not

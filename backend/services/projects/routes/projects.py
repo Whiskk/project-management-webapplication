@@ -22,7 +22,7 @@ from pm_core.db import transaction
 from pm_core.errors import Conflict, ValidationError
 from pm_core.http import Request, Response, Router, created, ok
 from pm_core.validation import Field, parse_choice, parse_id, parse_pagination, validate
-from project_queries import (
+from queries import (
     SELECT_PROJECT,
     attach_my_hours,
     audit_view,

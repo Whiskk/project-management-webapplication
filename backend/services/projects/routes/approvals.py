@@ -14,7 +14,6 @@ just a state change and can never break either rule.
 import psycopg
 from psycopg import sql
 
-from assignment_routes import fetch_assignment, load_assignment_view, name, serialize
 from pm_core import audit
 from pm_core.auth import deny, require_auth
 from pm_core.capacity import fmt_hours
@@ -22,7 +21,8 @@ from pm_core.db import transaction
 from pm_core.errors import Conflict, NotFound
 from pm_core.http import Request, Response, Router, ok
 from pm_core.validation import Field, parse_id, validate
-from project_queries import SELECT_PROJECT
+from queries import SELECT_PROJECT
+from routes.assignments import fetch_assignment, load_assignment_view, name, serialize
 
 REJECT_SPEC = {"note": Field("str", required=False, max_length=1000)}
 

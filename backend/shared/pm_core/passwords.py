@@ -51,12 +51,14 @@ def hash_password(password: str, iterations: int = _ITERATIONS) -> str:
     """Hash a password as ``pbkdf2_sha256$<iterations>$<salt>$<hash>``."""
     salt = secrets.token_bytes(16)
     digest = hashlib.pbkdf2_hmac("sha256", password.encode(), salt, iterations)
-    return "$".join([
-        _ALGORITHM,
-        str(iterations),
-        base64.b64encode(salt).decode(),
-        base64.b64encode(digest).decode(),
-    ])
+    return "$".join(
+        [
+            _ALGORITHM,
+            str(iterations),
+            base64.b64encode(salt).decode(),
+            base64.b64encode(digest).decode(),
+        ]
+    )
 
 
 def verify_password(password: str, stored: str) -> bool:

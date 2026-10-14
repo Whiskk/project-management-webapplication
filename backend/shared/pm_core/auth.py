@@ -95,9 +95,7 @@ def decode_token(token: str, expected_type: str) -> int:
             ``unauthorized`` for any invalid token.
     """
     try:
-        payload = jwt.decode(
-            token, _get_secret(), algorithms=[_ALGORITHM], options={"require": ["exp", "sub", "type"]}
-        )
+        payload = jwt.decode(token, _get_secret(), algorithms=[_ALGORITHM], options={"require": ["exp", "sub", "type"]})
     except jwt.ExpiredSignatureError:
         raise ApiError(401, "token_expired", "Your session has expired. Please sign in again.") from None
     except jwt.InvalidTokenError:

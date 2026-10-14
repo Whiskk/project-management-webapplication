@@ -20,7 +20,7 @@ from pm_core.auth import require_auth
 from pm_core.capacity import MAX_WEEKLY_HOURS
 from pm_core.db import transaction
 from pm_core.http import Request, Response, Router, ok
-from project_queries import SELECT_PROJECT, attach_my_hours, serialize, visibility_condition
+from queries import SELECT_PROJECT, attach_my_hours, serialize, visibility_condition
 
 ATTENTION_LIMIT = 8
 

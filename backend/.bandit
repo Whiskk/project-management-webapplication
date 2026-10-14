@@ -1,2 +1,3 @@
 [bandit]
-exclude = ./backend/tests,./backend/.venv,./tests,./.venv,*/psycopg/*,*/psycopg_binary/*,*/psycopg_binary.libs/*,*/jwt/*,*/typing_extensions.py
+# Tests use assert by design; .build holds generated packages with third-party libraries.
+exclude = ./backend/tests,./backend/.venv,./backend/.build,./tests,./.venv,./.build

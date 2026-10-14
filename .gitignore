@@ -257,16 +257,8 @@ tfplan
 # Snyk Security Extension - AI Rules (auto-generated)
 .github/instructions/snyk_rules.instructions.md
 
-# Backend services: shared code copied in by bin/sync-shared.sh and
-# Lambda-platform packages pip-installed by bin/start-dev.sh for hot-reload
-backend/*/pm_core/
-!backend/_shared/pm_core/
-backend/*/.pip_installed
-backend/*/*.dist-info/
-backend/*/psycopg*/
-backend/*/jwt/
-backend/*/bin/
-backend/*/typing_extensions.py
+# Backend: generated Lambda packages (bin/build-backend.sh) and coverage output
+backend/.build/
 backend/.coverage
 backend/htmlcov/
 frontend/coverage/

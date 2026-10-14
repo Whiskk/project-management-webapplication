@@ -86,6 +86,21 @@ Builds and deploys the React frontend to AWS.
 ./bin/deploy-frontend.sh [aws|local]
 ```
 
+### `build-backend.sh`
+
+Assembles one deployable package per backend service.
+
+**What it does**:
+
+* Installs `backend/requirements.txt` once, for the Lambda runtime (Python 3.13, manylinux x86_64), into `backend/.build/_deps` - re-installed only when the file changes
+* For each `backend/services/<name>/`, builds `backend/.build/<name>/` = the service's code + `backend/shared/pm_core` + the libraries (hard-linked, so no extra disk space)
+
+**When to use**: after changing backend code (LocalStack runs these packages directly, so changes are live). `start-dev.sh` and `deploy-backend.sh` run it automatically.
+
+```sh
+./bin/build-backend.sh
+```
+
 ### `start-dev.sh`
 
 Starts the complete development environment with hot-reload.

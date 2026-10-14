@@ -53,9 +53,9 @@ ENVIRONMENT=${1:-"aws"}
 echo "INFO: Deploying infrastructure..."
 echo "INFO: Environment - $ENVIRONMENT"
 
-# Copy shared backend code into each service so every Lambda package is self-contained
-echo "INFO: Syncing shared backend code..."
-"$SCRIPT_DIR/sync-shared.sh"
+# Assemble each Lambda package (service code + shared library + libraries)
+echo "INFO: Building backend packages..."
+"$SCRIPT_DIR/build-backend.sh"
 
 # Change to infrastructure directory
 cd "$INFRA_DIR"

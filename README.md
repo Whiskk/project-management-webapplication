@@ -63,8 +63,8 @@ graph LR
     L1 & L2 & L3 & L4 & L5 & L6 --> DB[("Aurora PostgreSQL")]
 ```
 
-- **Six Lambda services**, one per domain, each a folder under `backend/` (Terraform discovers them automatically). The `projects` service is split into route modules (projects, staffing, approvals, milestones, requests, dashboard) so related writes share one transaction.
-- **Shared core library** `backend/_shared/pm_core` (router, error format, validation, JWT/RBAC, audit, DB/migrations, budget, capacity, insights), copied into each service by [`bin/sync-shared.sh`](./bin/sync-shared.sh) because each Lambda is packaged on its own.
+- **Six Lambda services**, one per domain, each a folder under `backend/services/` containing only its own code (Terraform discovers them automatically). The `projects` service is organised as `queries.py`, `staffing.py` and a `routes/` package (projects, assignments, approvals, milestones, requests, dashboard) so related writes share one transaction.
+- **Shared core library** `backend/shared/pm_core` (router, error format, validation, JWT/RBAC, audit, DB/migrations, budget, capacity, insights, employee IDs) and **one `backend/requirements.txt`** for all services. [`bin/build-backend.sh`](./bin/build-backend.sh) assembles each Lambda's package in `backend/.build/<service>/` (code + shared library + libraries, installed once and hard-linked), which Terraform deploys and LocalStack runs.
 - **PostgreSQL only** (Aurora PostgreSQL Serverless v2 on AWS, PostgreSQL locally). Schema migrations run automatically from the Lambdas on first use (Aurora isn't reachable from the workshop VDI), guarded by an advisory lock. The template's MongoDB is not used.
 - **Consistent API:** JSON everywhere, errors as `{"error": {"code", "message", "details"}}`, status codes 200/201/204/400/401/403/404/405/409/429/500, `PATCH` and `PUT` for updates, filtering and pagination via query parameters.
 - **Frontend:** organised by feature (`auth/`, `pages/`, `components/<feature>/`, `services/`, `hooks/`); one API client with transparent token refresh; a central permissions map that hides what a role can't do; lazily loaded pages; 30 s polling for near-real-time data.
@@ -85,7 +85,7 @@ Open **http://localhost:3000** and sign in with a demo account (local only - see
 | Manager | `MM4R8T` | `Mngr01` |
 | Employee | `EE3H9W` | `Empl01` |
 
-After editing `backend/_shared/pm_core`, run `./bin/sync-shared.sh` (LocalStack runs the service folders directly, so changes are live).
+After editing backend code, run `./bin/build-backend.sh` (about a second); LocalStack runs the built packages directly, so changes are live without a redeploy.
 
 **Checks** (details in [TESTING.md](./TESTING.md)):
 
@@ -120,14 +120,18 @@ Sign in as `AA7K2P` with that password and reset the others from **Users**.
 
 ```
 backend/
-  _shared/pm_core/   shared library (copied into each service)
-  auth/ users/ projects/ audit/ monitor/ health/   one Lambda each (function.py + requirements.txt)
-  tests/             pytest suite (unit + integration against PostgreSQL)
+  requirements.txt     runtime libraries for every service (one list)
+  shared/pm_core/      shared library
+  services/            one Lambda each: auth/ users/ audit/ monitor/ health/ projects/
+    projects/          function.py, queries.py, staffing.py, routes/
+  tests/unit/          core logic (validation, budget, capacity, auth, audit, schema...)
+  tests/services/      each service end to end against PostgreSQL
+  .build/              generated Lambda packages (gitignored)
 frontend/
   src/               React app (auth/, pages/, components/<feature>/, services/, hooks/, utils/)
   e2e/               Playwright journeys
 infra/               Terraform (template) + cloudfront.tf SPA routing + scheduler.tf
-bin/                 dev/deploy scripts, sync-shared.sh, smoke-test.sh
+bin/                 dev/deploy scripts, build-backend.sh, smoke-test.sh
 loadtest/            Artillery load test
 docs/                workshop guides (unchanged)
 ```
@@ -136,7 +140,7 @@ docs/                workshop guides (unchanged)
 
 | Decision | Why | Trade-off |
 |---|---|---|
-| One Lambda per domain + a shared, copied library | Independent deploys and failure isolation, matching the template; no copy-pasted logic | A sync step (`sync-shared.sh`, automated in the scripts) |
+| One Lambda per domain + a shared library and one requirements list, assembled by a build step | Independent deploys and failure isolation, matching the template; no copy-pasted code or duplicated dependency lists; source folders contain only source | A build step (`build-backend.sh`, run automatically by the dev and deploy scripts) |
 | Requests, approvals, staffing and milestones inside the `projects` service | Approving a request *creates* a project; staffing touches budgets - each must be one transaction | A larger service, split into route modules |
 | Roles re-checked against the database on every request | Role changes and deactivations apply immediately, not when a 15-minute token expires | One extra indexed query per request |
 | Row locks (`FOR NO KEY UPDATE`) for the 40-hour and budget rules | Two simultaneous requests can't both squeeze into the last free hours or dollars (a test proves exactly one wins) | Brief serialisation on the same project/employee |

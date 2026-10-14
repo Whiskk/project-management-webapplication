@@ -1,5 +1,5 @@
 locals {
-  app_id = try(trimspace(var.aws_app_code), "") != "" ? trimspace(var.aws_app_code) : random_id.this.hex
+  app_id   = try(trimspace(var.aws_app_code), "") != "" ? trimspace(var.aws_app_code) : random_id.this.hex
   app_tags = { participant = local.app_id, event = random_id.this.hex }
   public_route_table_ids = [
     for rt in data.aws_route_table.this :
@@ -20,8 +20,11 @@ locals {
     for file in fileset(format("%s/../backend", path.module), "*/package.json") :
     dirname(file) if !startswith(dirname(file), "_") && !startswith(dirname(file), ".")
   ]
+  # Python services: every backend/services/<name>/function.py. Each is deployed
+  # from its assembled package in backend/.build/<name> (code + shared library +
+  # libraries, built by bin/build-backend.sh), so no per-service requirements.txt.
   backend_dirs_python = [
-    for file in fileset(format("%s/../backend", path.module), "*/requirements.txt") :
+    for file in fileset(format("%s/../backend/services", path.module), "*/function.py") :
     dirname(file) if !startswith(dirname(file), "_") && !startswith(dirname(file), ".")
   ]
   backend_names_java = {
@@ -55,9 +58,9 @@ locals {
       arch             = "x86_64"
       runtime          = "python3.13"
       handler          = "function.handler"
-      path             = abspath(format("%s/../backend/%s", path.module, name))
+      path             = abspath(format("%s/../backend/.build/%s", path.module, name))
       patterns         = ["!__pycache__/.*", "!\\..*"]
-      pip_requirements = true
+      pip_requirements = false # libraries are already in the package (bin/build-backend.sh)
     }
   }
   data_dirs_python = [

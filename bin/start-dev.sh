@@ -327,32 +327,10 @@ else
     echo -e "  Detected Mac/Windows - using host: host.docker.internal"
 fi
 
-# Copy shared backend code (backend/_shared/pm_core) into each Python service
-"$SCRIPT_DIR/sync-shared.sh"
+# Assemble each Lambda package in backend/.build (code + shared library + libraries)
+"$SCRIPT_DIR/build-backend.sh"
 
-# Install pip requirements into each Python service directory for hot-reload
-# Skip if requirements.txt hasn't changed since last install (avoids slow PyPI lookups)
-# Wheels are pinned to the Lambda runtime (Python 3.13, manylinux x86_64) so the
-# packages work inside the Lambda container whatever Python version runs locally.
 shopt -s nullglob
-for req in "$PROJECT_ROOT"/backend/*/requirements.txt; do
-    svc_dir="$(dirname "$req")"
-    case "$(basename "$svc_dir")" in _*|.*) continue ;; esac
-    REQS_HASH=$(md5sum "$req" 2>/dev/null | cut -d' ' -f1)
-    HASH_FILE="$svc_dir/.pip_installed"
-    if [ "$(cat "$HASH_FILE" 2>/dev/null)" = "$REQS_HASH" ]; then
-        echo -e "  pip requirements for $(basename "$svc_dir") already up to date, skipping..."
-        continue
-    fi
-    echo -e "  Installing pip requirements for $(basename "$svc_dir")..."
-    if python3 -m pip install --quiet --upgrade --target="$svc_dir" \
-        --platform manylinux2014_x86_64 --python-version 3.13 \
-        --implementation cp --only-binary=:all: -r "$req"; then
-        echo "$REQS_HASH" > "$HASH_FILE"
-    else
-        echo -e "  ⚠ pip install failed for $(basename "$svc_dir")"
-    fi
-done
 
 # Install npm dependencies into each Node.js service directory for hot-reload
 for pkg in "$PROJECT_ROOT"/backend/*/package.json; do
@@ -397,7 +375,8 @@ terraform init -reconfigure -backend-config="bucket=$BUCKET_NAME" -backend-confi
 }
 
 # Count services on disk vs deployed
-SERVICES_ON_DISK=$(find "$PROJECT_ROOT/backend" -mindepth 2 -maxdepth 2 \( -name "function.py" -o -name "package.json" -o -name "pom.xml" \) -not -path "*/_*" -not -path "*/\.*" | wc -l)
+SERVICES_ON_DISK=$( { find "$PROJECT_ROOT/backend/services" -mindepth 2 -maxdepth 2 -name "function.py" -not -path "*/_*"; \
+    find "$PROJECT_ROOT/backend" -mindepth 2 -maxdepth 2 \( -name "package.json" -o -name "pom.xml" \) -not -path "*/_*" -not -path "*/\.*"; } | wc -l)
 SERVICES_DEPLOYED=$(terraform output -json lambda_urls 2>/dev/null | grep -o 'http://[^"]*' | wc -l)
 
 # Check if backend is deployed and all services are present

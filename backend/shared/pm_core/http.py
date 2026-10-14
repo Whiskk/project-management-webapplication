@@ -166,25 +166,28 @@ class Router:
         except psycopg.errors.UniqueViolation:
             response = _error_response(Conflict("A record with these details already exists"))
         except psycopg.errors.ForeignKeyViolation:
-            response = _error_response(
-                ValidationError({"_": "A referenced record does not exist"})
-            )
+            response = _error_response(ValidationError({"_": "A referenced record does not exist"}))
         except psycopg.errors.CheckViolation:
             response = _error_response(ValidationError({"_": "A value is out of the allowed range"}))
         except Exception:  # pylint: disable=broad-except
             logger.exception("Unhandled error (request_id=%s)", request.request_id)
             response = Response(
                 status=500,
-                body={"error": {
-                    "code": "internal_error",
-                    "message": "Something went wrong. Please try again.",
-                    "details": {"request_id": request.request_id},
-                }},
+                body={
+                    "error": {
+                        "code": "internal_error",
+                        "message": "Something went wrong. Please try again.",
+                        "details": {"request_id": request.request_id},
+                    }
+                },
             )
         logger.info(
             "%s %s -> %s (%.0f ms, request_id=%s)",
-            request.method, request.path, response.status,
-            (time.perf_counter() - started) * 1000, request.request_id,
+            request.method,
+            request.path,
+            response.status,
+            (time.perf_counter() - started) * 1000,
+            request.request_id,
         )
         return response.to_lambda()
 
@@ -211,7 +214,7 @@ class Router:
         method = (http.get("method") or event.get("httpMethod") or "GET").upper()
         path = event.get("rawPath") or event.get("path") or "/"
         if path == self._prefix or path.startswith(self._prefix + "/"):
-            path = path[len(self._prefix):]
+            path = path[len(self._prefix) :]
         path = "/" + path.strip("/")
 
         raw_body = event.get("body") or ""

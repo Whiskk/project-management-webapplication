@@ -1,20 +1,11 @@
-# Backend tooling configuration (the services themselves are plain Lambda
-# folders with their own requirements.txt; this file is only for linting).
+# Backend tooling configuration (linting only). The services under services/ are
+# plain Lambda folders; their shared dependencies live in requirements.txt.
 
 [tool.ruff]
 target-version = "py313"
 line-length = 120
-# Vendored packages installed into service folders by bin/start-dev.sh, the
-# synced copies of _shared/pm_core, and the template's example services.
-extend-exclude = [
-    "_examples",
-    "*/pm_core",
-    "*/psycopg",
-    "*/psycopg_binary",
-    "*/jwt",
-    "*/typing_extensions.py",
-    "*/bin",
-]
+# Generated Lambda packages (bin/build-backend.sh) and the template's examples.
+extend-exclude = [".build", "_examples"]
 
 [tool.ruff.lint]
 select = [
@@ -31,10 +22,11 @@ select = [
 
 [tool.ruff.lint.per-file-ignores]
 # Tests import from conftest after adjusting sys.path.
-"tests/*" = ["E402"]
-"tests/conftest.py" = ["E402"]
+"tests/**" = ["E402"]
+# HTTP error classes are named after their status (NotFound, Conflict...), like Werkzeug's.
+"shared/pm_core/errors.py" = ["N818"]
 
 [tool.ruff.lint.isort]
 # Service-local modules (imported by bare name inside each Lambda package).
-known-first-party = ["pm_core", "project_queries", "project_routes", "staffing", "assignment_routes",
-                     "approval_routes", "milestone_routes", "request_routes", "dashboard_routes", "conftest"]
+# Service-local modules are imported by bare name inside each Lambda package.
+known-first-party = ["pm_core", "queries", "staffing", "routes", "conftest"]

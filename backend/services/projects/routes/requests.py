@@ -24,7 +24,7 @@ from pm_core.db import transaction
 from pm_core.errors import Conflict, NotFound, ValidationError
 from pm_core.http import Request, Response, Router, created, ok
 from pm_core.validation import Field, parse_choice, parse_id, validate
-from project_routes import check_dates, insert_project
+from routes.projects import check_dates, insert_project
 
 STATUSES = ("pending", "approved", "rejected", "withdrawn")
 

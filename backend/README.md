@@ -63,21 +63,18 @@ coding-workshop-participant/
 
 ## Adding a New Service
 
-Place your service folder **directly under `backend/`** — one level deep:
+This project keeps each service's source in its own folder under `backend/services/`, with the shared library in `backend/shared/pm_core/` and one dependency list, `backend/requirements.txt`:
 
 ```
 backend/
-├── my-service/          ✓ will be deployed
-│   └── function.py
-├── _examples/
-│   └── my-service/      ✗ will NOT be deployed (underscore prefix)
-│       └── function.py
-└── group/
-    └── my-service/      ✗ will NOT be deployed (too deep)
-        └── function.py
+├── requirements.txt         # runtime libraries for every service
+├── shared/pm_core/          # shared library (router, auth, DB, audit, ...)
+└── services/
+    └── my-service/
+        └── function.py      # handler(event, context) - deployed automatically
 ```
 
-Terraform auto-discovers services by looking for `function.py` (Python), `package.json` (Node.js), or `pom.xml` (Java) one level under `backend/`. Any folder prefixed with `_` is ignored.
+Terraform discovers every `backend/services/<name>/function.py`. `bin/build-backend.sh` (run by `start-dev.sh` and `deploy-backend.sh`) assembles `backend/.build/<name>/` - the service code plus `pm_core` plus the libraries - which is what gets deployed and what LocalStack runs. Service names must not be prefixes of one another (CloudFront routes `/api/<name>*`).
 
 ## Usage
 

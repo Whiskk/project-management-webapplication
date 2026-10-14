@@ -29,7 +29,7 @@ from pm_core.db import transaction
 from pm_core.errors import Conflict, NotFound, ValidationError
 from pm_core.http import Request, Response, Router, created, no_content, ok
 from pm_core.validation import Field, parse_id, validate
-from project_queries import fetch_project_for_write, fetch_visible_project
+from queries import fetch_project_for_write, fetch_visible_project
 
 STATUSES = ("not_started", "in_progress", "completed", "blocked")
 STARTED = ("in_progress", "completed")

@@ -29,7 +29,7 @@ os.environ.update(
         "POSTGRES_NAME": TEST_DB,
     }
 )
-sys.path.insert(0, str(BACKEND_DIR / "_shared"))
+sys.path.insert(0, str(BACKEND_DIR / "shared"))
 
 import psycopg  # noqa: E402
 
@@ -81,9 +81,9 @@ def bearer(employee_id: str) -> dict:
 
 
 def load_service(name: str) -> ModuleType:
-    """Import ``backend/<name>/function.py`` as a uniquely named module."""
-    service_dir = BACKEND_DIR / name
-    # Services may split routes into sibling modules (e.g. projects/project_routes.py).
+    """Import ``backend/services/<name>/function.py`` as a uniquely named module."""
+    service_dir = BACKEND_DIR / "services" / name
+    # Services may have their own modules and packages (e.g. projects/routes/).
     if str(service_dir) not in sys.path:
         sys.path.append(str(service_dir))
     path = service_dir / "function.py"

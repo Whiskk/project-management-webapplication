@@ -263,21 +263,33 @@ MIGRATIONS: list[tuple[int, str | Callable[[psycopg.Cursor], None]]] = [
 # so the public source code never contains a usable cloud credential.
 DEMO_USERS: list[dict] = [
     {
-        "employee_id": "AA7K2P", "first_name": "Alex", "last_name": "Admin",
-        "email": "alex.admin@example.com", "job_title": "Administrator",
-        "salary": 120000, "role": "admin",
+        "employee_id": "AA7K2P",
+        "first_name": "Alex",
+        "last_name": "Admin",
+        "email": "alex.admin@example.com",
+        "job_title": "Administrator",
+        "salary": 120000,
+        "role": "admin",
         "local_password": "Admin1",  # nosec B105 - local-only demo credential (see above)
     },
     {
-        "employee_id": "MM4R8T", "first_name": "Morgan", "last_name": "Manager",
-        "email": "morgan.manager@example.com", "job_title": "Engineering Manager",
-        "salary": 110000, "role": "manager",
+        "employee_id": "MM4R8T",
+        "first_name": "Morgan",
+        "last_name": "Manager",
+        "email": "morgan.manager@example.com",
+        "job_title": "Engineering Manager",
+        "salary": 110000,
+        "role": "manager",
         "local_password": "Mngr01",  # nosec B105 - local-only demo credential (see above)
     },
     {
-        "employee_id": "EE3H9W", "first_name": "Eli", "last_name": "Employee",
-        "email": "eli.employee@example.com", "job_title": "Software Engineer",
-        "salary": 90000, "role": "employee",
+        "employee_id": "EE3H9W",
+        "first_name": "Eli",
+        "last_name": "Employee",
+        "email": "eli.employee@example.com",
+        "job_title": "Software Engineer",
+        "salary": 90000,
+        "role": "employee",
         "local_password": "Empl01",  # nosec B105 - local-only demo credential (see above)
         "manager_employee_id": "MM4R8T",
     },
@@ -333,8 +345,14 @@ def _seed_demo_users(cur: psycopg.Cursor) -> None:
             RETURNING id
             """,
             (
-                user["employee_id"], user["first_name"], user["last_name"], user["email"],
-                user["job_title"], user["salary"], user["role"], manager_id,
+                user["employee_id"],
+                user["first_name"],
+                user["last_name"],
+                user["email"],
+                user["job_title"],
+                user["salary"],
+                user["role"],
+                manager_id,
                 passwords.hash_password(password),
             ),
         )

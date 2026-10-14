@@ -1,0 +1,4 @@
+# Runtime dependencies for every backend service (one list for all Lambdas).
+# bin/build-backend.sh installs them once and links them into each Lambda package.
+psycopg[binary]==3.2.3
+PyJWT==2.10.1
