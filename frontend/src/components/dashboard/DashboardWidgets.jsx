@@ -36,7 +36,7 @@ export function CapacityBar({ used, capacity, label }) {
       variant="determinate"
       value={percent}
       color={percent >= 100 ? 'error' : percent >= 80 ? 'warning' : 'primary'}
-      sx={{ height: 8, borderRadius: 4 }}
+      sx={{ height: 8, borderRadius: 0.5 }}
       aria-label={label}
     />
   );

@@ -1,9 +1,9 @@
 import { alpha, createTheme } from '@mui/material/styles';
 
-// Dark slate surfaces with the brand blue and teal, lifted a shade so they keep
-// enough contrast on a dark background. The original #1f4e8c stays as primary.dark.
-const BRAND_BLUE = '#4c8ee0';
-const BRAND_TEAL = '#2bb3b5';
+// Dark slate surfaces with a soft, muted orange as the accent (dark text on it,
+// so filled buttons stay calm rather than glaring) and a quiet teal secondary.
+const BRAND_ORANGE = '#e0915a';
+const BRAND_TEAL = '#3aa6a8';
 
 const surface = {
   base: '#0b1120', // page background
@@ -15,8 +15,8 @@ const surface = {
 const theme = createTheme({
   palette: {
     mode: 'dark',
-    primary: { main: BRAND_BLUE, light: '#7fb0ee', dark: '#1f4e8c', contrastText: '#ffffff' },
-    secondary: { main: BRAND_TEAL, light: '#5fd0d1', dark: '#0f8b8d', contrastText: '#ffffff' },
+    primary: { main: BRAND_ORANGE, light: '#ecb085', dark: '#b8693a', contrastText: '#1a1410' },
+    secondary: { main: BRAND_TEAL, light: '#66c3c4', dark: '#23797b', contrastText: '#0b1418' },
     error: { main: '#f26d6d' },
     warning: { main: '#f0a24a' },
     success: { main: '#3fbf7f' },
@@ -24,9 +24,10 @@ const theme = createTheme({
     background: { default: surface.base, paper: surface.raised },
     divider: surface.border,
     text: { primary: '#e6ebf3', secondary: '#94a3b8' },
-    action: { hover: 'rgba(148, 163, 184, 0.08)', selected: alpha(BRAND_BLUE, 0.16) },
+    action: { hover: 'rgba(148, 163, 184, 0.08)', selected: alpha(BRAND_ORANGE, 0.14) },
   },
-  shape: { borderRadius: 10 },
+  // Tighter corners throughout: 4px base, 6px for larger surfaces.
+  shape: { borderRadius: 4 },
   typography: {
     fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
     h1: { fontSize: '1.75rem', fontWeight: 650, letterSpacing: '-0.02em' },
@@ -57,7 +58,7 @@ const theme = createTheme({
     },
     MuiCard: {
       defaultProps: { variant: 'outlined' },
-      styleOverrides: { root: { borderRadius: 12, borderColor: surface.border } },
+      styleOverrides: { root: { borderRadius: 6, borderColor: surface.border } },
     },
     MuiCardActionArea: {
       styleOverrides: { root: { '&:hover .MuiCardActionArea-focusHighlight': { opacity: 0.04 } } },
@@ -80,11 +81,11 @@ const theme = createTheme({
     MuiButton: {
       defaultProps: { disableElevation: true },
       styleOverrides: {
-        root: { textTransform: 'none', borderRadius: 8 },
+        root: { textTransform: 'none', borderRadius: 4 },
         outlined: { borderColor: 'rgba(148, 163, 184, 0.3)' },
       },
     },
-    MuiIconButton: { styleOverrides: { root: { borderRadius: 8 } } },
+    MuiIconButton: { styleOverrides: { root: { borderRadius: 4 } } },
     MuiOutlinedInput: {
       styleOverrides: {
         root: {
@@ -119,19 +120,19 @@ const theme = createTheme({
     MuiTableRow: {
       styleOverrides: { root: { '&:last-child td': { borderBottom: 0 } } },
     },
-    MuiChip: { styleOverrides: { root: { fontWeight: 500 } } },
+    MuiChip: { styleOverrides: { root: { fontWeight: 500, borderRadius: 4 } } },
     MuiTabs: {
       styleOverrides: { root: { borderBottom: `1px solid ${surface.border}` } },
     },
     MuiTab: { styleOverrides: { root: { textTransform: 'none', fontWeight: 600, minHeight: 48 } } },
     MuiDialog: {
-      styleOverrides: { paper: { border: `1px solid ${surface.border}`, borderRadius: 14 } },
+      styleOverrides: { paper: { border: `1px solid ${surface.border}`, borderRadius: 6 } },
     },
     MuiMenu: {
       styleOverrides: { paper: { border: `1px solid ${surface.border}`, marginTop: 6 } },
     },
     MuiAlert: {
-      styleOverrides: { root: { borderRadius: 10, alignItems: 'center' } },
+      styleOverrides: { root: { borderRadius: 4, alignItems: 'center' } },
     },
     MuiTooltip: {
       styleOverrides: {
@@ -142,7 +143,7 @@ const theme = createTheme({
       styleOverrides: { root: { backgroundColor: 'rgba(148, 163, 184, 0.14)' } },
     },
     MuiListItemButton: {
-      styleOverrides: { root: { borderRadius: 8 } },
+      styleOverrides: { root: { borderRadius: 4 } },
     },
   },
 });

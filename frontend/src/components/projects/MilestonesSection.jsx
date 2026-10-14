@@ -118,7 +118,7 @@ export default function MilestonesSection({ project, canEdit, onChanged }) {
             variant="determinate"
             value={summary.percent_complete}
             color={summary.overdue > 0 ? 'warning' : 'success'}
-            sx={{ height: 6, borderRadius: 3, mb: 2 }}
+            sx={{ height: 6, borderRadius: 0.5, mb: 2 }}
             aria-label="Milestones completed"
           />
         )}

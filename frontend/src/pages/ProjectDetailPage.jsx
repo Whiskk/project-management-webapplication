@@ -59,7 +59,7 @@ function BudgetStat({ project }) {
           variant="determinate"
           value={used}
           color={project.over_budget ? 'error' : used > 90 ? 'warning' : 'primary'}
-          sx={{ my: 1, height: 6, borderRadius: 3 }}
+          sx={{ my: 1, height: 6, borderRadius: 0.5 }}
           aria-label="Budget used"
         />
         <Typography variant="body2" color={project.over_budget ? 'error.main' : 'text.secondary'}>

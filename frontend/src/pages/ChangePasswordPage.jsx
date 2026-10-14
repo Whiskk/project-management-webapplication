@@ -23,8 +23,8 @@ export default function ChangePasswordPage() {
   if (!user?.must_change_password) return <Navigate to="/" replace />;
 
   return (
-    <Box sx={{ minHeight: '100vh', display: 'grid', placeItems: 'center', p: 2, bgcolor: 'background.default', backgroundImage: 'radial-gradient(ellipse 80% 60% at 50% -10%, rgba(76, 142, 224, 0.22), transparent 70%), radial-gradient(ellipse 50% 40% at 90% 110%, rgba(43, 179, 181, 0.12), transparent 70%)' }}>
-      <Card sx={{ width: '100%', maxWidth: 440, boxShadow: '0 24px 64px rgba(0, 0, 0, 0.45)' }}>
+    <Box sx={{ minHeight: '100vh', display: 'grid', placeItems: 'center', p: 2, bgcolor: 'background.default', backgroundImage: 'radial-gradient(ellipse 80% 60% at 50% -10%, rgba(224, 145, 90, 0.16), transparent 70%), radial-gradient(ellipse 50% 40% at 90% 110%, rgba(58, 166, 168, 0.08), transparent 70%)' }}>
+      <Card sx={{ width: '100%', maxWidth: 440, boxShadow: '0 16px 48px rgba(0, 0, 0, 0.4)' }}>
         <CardContent sx={{ p: { xs: 3, sm: 4 } }}>
           <Stack spacing={2.5}>
             <div>
