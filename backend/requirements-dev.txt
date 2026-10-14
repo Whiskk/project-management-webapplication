@@ -5,3 +5,4 @@ pytest==8.4.2
 pytest-cov==7.0.0
 bandit==1.9.4
 ruff==0.14.0
+PyYAML==6.0.3  # reads docs/api/openapi.yaml in tests/unit/test_openapi.py

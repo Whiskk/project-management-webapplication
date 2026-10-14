@@ -4,7 +4,9 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "predev": "node scripts/copy-openapi.mjs",
     "dev": "vite",
+    "prebuild": "node scripts/copy-openapi.mjs",
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",

@@ -1,16 +1,18 @@
 # Testing
 
 How Project Hub is tested, how to run every suite, and the latest results.
-Results below are from **14 October 2026**, against commit `a99f17d` (local) and the AWS deployment at https://d37hjhs1g613o6.cloudfront.net.
+Results below are from **14 October 2026**, from local runs of the latest code and the AWS deployment at https://d37hjhs1g613o6.cloudfront.net.
 
 ## Summary
 
 | Layer | Tool | Tests | Result | Coverage |
 |---|---|---|---|---|
-| Backend unit + integration | pytest (+ pytest-cov) against a real PostgreSQL `pm_test` database | **372** | ✅ all pass | **98%** of backend code (2,163 statements, 37 uncovered) |
+| Backend unit + integration | pytest (+ pytest-cov) against a real PostgreSQL `pm_test` database | **376** | ✅ all pass | **98%** of backend code (2,163 statements, 37 uncovered) |
 | Frontend components + services | Vitest + React Testing Library | **168** | ✅ all pass | **91.5% lines**, 90.2% statements, 86.4% branches, 82.7% functions |
-| End-to-end (browser) | Playwright (Chromium desktop + Pixel 7 mobile) | **20 journeys** | ✅ all pass locally (18 also on AWS; 2 new pending deploy) | all critical user paths (below) |
+| End-to-end (browser) | Playwright (Chromium desktop + Pixel 7 mobile) | **22 journeys** | ✅ all pass locally (18 also confirmed on AWS; the 4 newest not yet run there) | all critical user paths (below) |
 | Accessibility | axe-core in Playwright, WCAG 2.0/2.1/2.2 A and AA | **5 scans, 20+ screens** | ✅ no violations | every page for every role, key dialogs, error states, phone menu |
+| API test suite | Postman collection run by Newman (`bin/api-tests.sh`) | **90 requests, 300 assertions** | ✅ 300/300 locally | every service, role rule and business-rule refusal |
+| API contract | OpenAPI 3 spec; Redocly lint; pytest check against the routers | **52 operations** | ✅ valid, and in sync with the code | every route the services register |
 | Live API smoke test | `bin/smoke-test.sh` (curl) | **75 checks** | ✅ 75/75 **locally and on AWS** | every service and business rule |
 | Load | Artillery | 700 virtual users, 4,200 requests | ✅ 0 errors on AWS | see [Performance](#performance) |
 | Static analysis | ruff (Python), ESLint (JS), bandit (security), npm audit | - | ✅ all clean | - |
@@ -38,6 +40,11 @@ npm audit --audit-level=high                    # the same check CI runs
 npx playwright install chromium                 # once
 npm run e2e                                     # local
 ../bin/e2e-live.sh                              # AWS: reads the demo passwords from CloudWatch; add --ui or --headed to watch
+
+# API suite: Postman collection via Newman (HTML report in postman/reports/)
+./bin/api-tests.sh                              # local
+./bin/api-tests.sh aws                          # AWS: reads the demo passwords from CloudWatch
+npx @redocly/cli@1.25.11 lint --config docs/api/redocly.yaml docs/api/openapi.yaml   # spec lint
 
 # Live smoke test (local by default)
 ./bin/smoke-test.sh
@@ -67,6 +74,7 @@ Every service is tested by calling its real Lambda `handler()` with Function URL
 | Requests | Submit/withdraw/approve/reject; approval creates the project in the same transaction; failed approval creates nothing |
 | Audit | Managers see only their own and their direct reports' entries (other teams, managers, admins hidden; filters, counts and pagination stay in scope; reassignment moves history); same-transaction writes, rollback leaves no entry, append-only (UPDATE/DELETE/TRUNCATE rejected by the database), redaction, filters, no write routes |
 | Monitor | Flags each over-budget change once, records recovery, admin-only trigger, scheduled events can't be forged over HTTP |
+| API contract | Every route registered by the six services appears in `docs/api/openapi.yaml` with the same method and path, and nothing documented is missing from the code; every `$ref` resolves; every authenticated operation documents 401; operation IDs are unique |
 | Regressions | Cross-connection lock deadlock (denied-attempt audit vs a locked row) - fixed with `FOR NO KEY UPDATE` and a lock timeout |
 
 ## Frontend tests (Vitest + React Testing Library)
@@ -104,8 +112,9 @@ Run in real Chromium against the running app and backend; each run creates uniqu
 | Budget monitor on demand | Admin runs the budget check from the dashboard |
 | Dashboard navigation | Dashboard tiles link to the matching pages |
 | Mobile layout (Pixel 7) | Slide-out navigation |
+| **API reference** | `/api-docs` opens Swagger UI with every service; *Try it out* on `GET /api/health` really calls the API; `/openapi.yaml` downloads |
 
-**Result:** 20/20 journeys locally; the 18 earlier journeys also pass against AWS (the two new ones run there after the next deploy).
+**Result:** 22/22 journeys locally. The 18 older journeys also pass against AWS; the four newest (managers' audit log, tasks, and the two API reference checks) haven't been run there yet. The API reference page goes live with the next frontend deploy.
 
 ### Accessibility (axe)
 
@@ -113,9 +122,30 @@ Run in real Chromium against the running app and backend; each run creates uniqu
 
 The first scan found two real issues, both fixed: sidebar links were direct children of a list (now wrapped in list items), and loading placeholders had a label but no role (now `progressbar`). Colour contrast passes in the dark theme.
 
-**Result:** 5/5, no violations; the full Playwright suite is 25/25 locally (≈3.4 min).
+**Result:** 5/5, no violations; the full Playwright suite is 27/27 locally (≈3.8 min).
 
 To watch the journeys run (e.g. for a demo), from `frontend/`: `npx playwright test --ui` (pick and replay tests step by step), or `npx playwright test --headed --project=desktop` (a real browser window).
+
+## API tests (Postman + Newman)
+
+[postman/project-hub.postman_collection.json](./postman/project-hub.postman_collection.json) is a single ordered journey through the API, written for the deployed system as much as for local development. It needs nothing but the three demo accounts: it creates its own uniquely named data and archives or deactivates it at the end, so it can run against the live site repeatedly. Every request also checks that the response is JSON and that errors use the standard `{"error": {"code", "message"}}` shape.
+
+| Folder | Requests | What is proven |
+|---|---|---|
+| 0. Health | 2 | API and database up, schema migrated; unsupported methods get 405 |
+| 1. Auth | 11 | Unknown IDs refused like wrong passwords; per-field validation; unknown fields rejected; each role signs in; missing and forged tokens are 401; refresh works and an access token can't be used as a refresh token |
+| 2. Users | 13 | Role limits on listing and creating; every invalid field reported at once; employees need a manager; generated initials-based ID and one-time password; unique emails (case-insensitive); employees see only themselves; managers edit reports but not salaries; PUT alias |
+| 3. Projects | 8 | Admin-only creation; date validation; hidden projects are 404, not 403; search; managers edit their project but not its name |
+| 4. Staffing and approvals | 12 | 40-hour cap; own-report staffing is immediate; no duplicates; budget can't drop below projected cost; admin staffing waits for the employee's own manager, who (not the admin) approves; nothing left to approve twice; employees see the team and project without any money figures |
+| 5. Milestones and tasks | 21 | Milestone date and dependency rules; no circular dependencies; tasks only for approved team members; tasks wait on the milestone's dependencies; only the assignee, project manager or admin can tick; a milestone can't complete with open tasks; completed milestones keep their tasks closed; progress summary |
+| 6. Project requests | 8 | Managers only; a rejection needs a reason; decided requests can't be decided again; withdraw; managers see only their own |
+| 7. Audit log | 6 | Every step above was recorded against the project; refused attempts recorded as *denied*; managers see themselves and their reports but never admins, even when filtering for them; employees refused |
+| 8. Budget monitor | 2 | Admin-only on-demand budget check and its result |
+| 9. Clean up | 7 | Archived projects are read-only and hidden from employees; the new hire is deactivated; everyone signs out |
+
+**Result:** 90/90 requests, **300/300 assertions** locally (≈4 s). The suite also passed a second consecutive run, which confirms it is repeatable. Run it in Postman (*Run collection* with an environment from `postman/`) or with `./bin/api-tests.sh [aws]`.
+
+The OpenAPI spec ([docs/api/openapi.yaml](./docs/api/openapi.yaml)) is checked two ways: Redocly lint (valid OpenAPI 3.0.3, examples match their schemas) and a pytest check that the documented routes match the routers exactly.
 
 ## Performance
 
@@ -135,7 +165,7 @@ Sign-in is deliberately expensive: passwords are hashed with PBKDF2 (120,000 rou
 
 ## Manual validation checklist
 
-Run against the deployed app after each release (the smoke test automates the API side of all of these):
+Run against the deployed app after each release (the smoke test and the Postman suite automate the API side of all of these):
 
 - [x] Each role signs in and sees the right dashboard and navigation
 - [x] Admin creates a user; the one-time password works; reset and deactivate/reactivate work

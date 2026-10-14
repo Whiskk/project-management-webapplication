@@ -1,0 +1,8 @@
+# Lint config for openapi.yaml:  npx @redocly/cli@1.25.11 lint --config docs/api/redocly.yaml docs/api/openapi.yaml
+extends:
+  - recommended
+rules:
+  no-server-example.com: off     # localhost:3001 is the documented local dev proxy
+  # GET /api/health takes no input and needs no sign-in, so it has no 4xx response. Every other
+  # operation documents 401 (enforced by backend/tests/unit/test_openapi.py).
+  operation-4xx-response: off

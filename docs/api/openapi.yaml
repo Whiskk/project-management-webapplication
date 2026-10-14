@@ -1,0 +1,2019 @@
+openapi: 3.0.3
+info:
+  title: Project Hub API
+  version: "1.0.0"
+  description: |
+    REST API for Project Hub, a project management system with three roles: **admin**, **manager** and **employee**.
+
+    Each tag below is a separate AWS Lambda function behind CloudFront (`/api/<service>/...`), backed by PostgreSQL.
+
+    ## Signing in
+    1. `POST /api/auth/login` with an employee ID and password.
+    2. Send the returned `access_token` as `Authorization: Bearer <token>` on every other call.
+       Access tokens last 15 minutes. `POST /api/auth/refresh` exchanges the 8-hour refresh token for a new pair.
+
+    In Swagger UI, call **login**, copy `access_token`, then click **Authorize**.
+
+    Local demo accounts: `AA7K2P` / `Admin1` (admin), `MM4R8T` / `Mngr01` (manager), `EE3H9W` / `Empl01` (employee).
+    The deployed site uses private random passwords for the same accounts.
+
+    ## Conventions
+    - **Errors** always have the shape `{"error": {"code", "message", "details"}}`.
+      For `validation_error`, `details` maps each invalid field to a message, so a form can show it next to the input.
+      All problems are reported together, not one at a time.
+    - **Unknown fields are rejected** (400), so a typo in a field name is never silently ignored.
+    - **Updates are partial**: send only the fields to change. `PATCH` and `PUT` are interchangeable on every update route.
+    - **Money and hours** are JSON numbers. Dates are `YYYY-MM-DD`; timestamps are ISO 8601 with a time zone.
+    - **Visibility**: a project you are not allowed to see is reported as 404, not 403, so its existence is not revealed.
+    - **Audit log**: every change, and every refused attempt to change something, is recorded in the same database transaction as the change.
+    - **Lockout**: 5 failed sign-ins for one employee ID within 15 minutes return 429 until the window passes.
+  contact:
+    name: Project Hub (Citi coding workshop, Full Stack track)
+  license:
+    name: MIT-0
+    url: https://opensource.org/license/mit-0
+servers:
+  - url: /
+    description: The site serving this page (Swagger UI at /api-docs.html)
+  - url: https://d37hjhs1g613o6.cloudfront.net
+    description: AWS (CloudFront -> Lambda -> Aurora PostgreSQL)
+  - url: http://localhost:3001
+    description: Local development proxy (./bin/start-dev.sh)
+security:
+  - bearerAuth: []
+tags:
+  - name: Health
+    description: Service status. No sign-in needed.
+  - name: Auth
+    description: Sign in, refresh tokens, change password, sign out.
+  - name: Users
+    description: Accounts. Admins manage everyone; managers edit their direct reports; everyone edits their own profile.
+  - name: Projects
+    description: Projects are never deleted, only archived. Budgets are hard limits.
+  - name: Staffing
+    description: |
+      Assign employees to projects by hours per week. Two rules are enforced inside the write transaction, with row locks:
+      nobody works more than 40 hours in any week, and the projected labour cost never exceeds the budget.
+  - name: Approvals
+    description: |
+      Hours for someone else's report need that employee's own manager to approve them. Pending hours are reserved
+      immediately, so approving can never break the 40-hour or budget rules.
+  - name: Milestones
+    description: Milestones with dependencies (no cycles; a milestone can't start until what it depends on is completed).
+  - name: Tasks
+    description: A checklist inside each milestone. Each task has at most one assignee from the project's approved team.
+  - name: Requests
+    description: Managers request new projects; admins approve (creating the project) or reject them.
+  - name: Dashboard
+    description: One endpoint whose content depends on the caller's role.
+  - name: Audit
+    description: Read-only audit log. Admins see everything; managers see themselves and their direct reports.
+  - name: Monitor
+    description: The budget check, which also runs hourly on an EventBridge schedule.
+
+paths:
+  # ------------------------------------------------------------------ health
+  /api/health:
+    get:
+      tags: [Health]
+      operationId: getHealth
+      summary: API and database status
+      security: []
+      responses:
+        "200":
+          description: The API is up and the database is reachable.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Health" }
+
+  # ------------------------------------------------------------------ auth
+  /api/auth/login:
+    post:
+      tags: [Auth]
+      operationId: login
+      summary: Sign in with employee ID and password
+      description: |
+        Employee IDs are case-insensitive. Wrong passwords and unknown IDs get the same response and take the same time,
+        so the endpoint can't be used to discover which IDs exist. Every attempt is audited.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/LoginRequest" }
+            example: { employee_id: MM4R8T, password: Mngr01 }
+      responses:
+        "200":
+          description: Signed in.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TokenBundle" }
+        "400": { $ref: "#/components/responses/ValidationFailed" }
+        "401":
+          description: Wrong employee ID or password, or the account is deactivated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+              example: { error: { code: unauthorized, message: Invalid employee ID or password } }
+        "429":
+          description: Too many failed attempts for this employee ID in the last 15 minutes.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+              example:
+                error: { code: too_many_attempts, message: Too many failed sign-in attempts. Try again in 15 minutes. }
+  /api/auth/refresh:
+    post:
+      tags: [Auth]
+      operationId: refreshTokens
+      summary: Exchange a refresh token for new tokens
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [refresh_token]
+              properties:
+                refresh_token: { type: string, maxLength: 4096 }
+      responses:
+        "200":
+          description: New access and refresh tokens.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TokenBundle" }
+        "400": { $ref: "#/components/responses/ValidationFailed" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /api/auth/me:
+    get:
+      tags: [Auth]
+      operationId: getMe
+      summary: The signed-in user
+      description: Works while a temporary password is still active, so the app can send the user to the change-password screen.
+      responses:
+        "200":
+          description: The current user.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CurrentUser" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /api/auth/change-password:
+    post:
+      tags: [Auth]
+      operationId: changePassword
+      summary: Choose a new password
+      description: |
+        Required after an admin creates the account or resets its password. Until then, every other endpoint except
+        `me` and `logout` returns 403 `password_change_required`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [current_password, new_password]
+              properties:
+                current_password: { type: string, maxLength: 128 }
+                new_password:
+                  type: string
+                  minLength: 8
+                  maxLength: 128
+                  description: At least one letter and one number, and different from the current password.
+      responses:
+        "200":
+          description: Password changed; `must_change_password` is now false.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CurrentUser" }
+        "400": { $ref: "#/components/responses/ValidationFailed" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /api/auth/logout:
+    post:
+      tags: [Auth]
+      operationId: logout
+      summary: Record a sign-out
+      description: Tokens are stateless and discarded by the client; this records the sign-out in the audit log.
+      responses:
+        "204": { description: Signed out. }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  # ------------------------------------------------------------------ users
+  /api/users:
+    get:
+      tags: [Users]
+      operationId: listUsers
+      summary: Search users
+      description: "Admins and managers. Sorted by last name, then first name."
+      parameters:
+        - { name: q, in: query, schema: { type: string }, description: "Matches name, email, employee ID or job title." }
+        - { name: role, in: query, schema: { $ref: "#/components/schemas/Role" } }
+        - { name: manager_id, in: query, schema: { type: integer, minimum: 1 }, description: Direct reports of this manager. }
+        - name: status
+          in: query
+          schema: { type: string, enum: [active, inactive, all], default: active }
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PageSize"
+      responses:
+        "200":
+          description: One page of users.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, total]
+                properties:
+                  items: { type: array, items: { $ref: "#/components/schemas/User" } }
+                  total: { type: integer, description: Matching users across all pages. }
+        "400": { $ref: "#/components/responses/ValidationFailed" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+    post:
+      tags: [Users]
+      operationId: createUser
+      summary: Create an account (admin)
+      description: |
+        The employee ID is generated from the person's initials plus 4 random characters (for example `EE3H9W`) and never changes.
+        A 6-character temporary password is returned **once**; the user must replace it at first sign-in.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UserCreate" }
+            example:
+              first_name: Nina
+              last_name: Newhire
+              email: nina.newhire@example.com
+              job_title: Analyst
+              salary: 65000
+              role: employee
+              manager_id: 2
+      responses:
+        "201":
+          description: Account created.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [user, temporary_password]
+                properties:
+                  user: { $ref: "#/components/schemas/User" }
+                  temporary_password: { type: string, example: k7PqR2 }
+        "400": { $ref: "#/components/responses/ValidationFailed" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+  /api/users/me:
+    patch:
+      tags: [Users]
+      operationId: updateMyProfile
+      summary: Edit your own name and email
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ProfileUpdate" }
+      responses:
+        "200":
+          description: Updated profile.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/User" }
+        "400": { $ref: "#/components/responses/ValidationFailed" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+    put:
+      tags: [Users]
+      operationId: replaceMyProfile
+      summary: Edit your own name and email (PUT alias of PATCH)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ProfileUpdate" }
+      responses:
+        "200":
+          description: Updated profile.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/User" }
+        "400": { $ref: "#/components/responses/ValidationFailed" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /api/users/{id}:
+    parameters:
+      - $ref: "#/components/parameters/UserId"
+    get:
+      tags: [Users]
+      operationId: getUser
+      summary: View a user
+      description: Employees may only view themselves. Salary is shown only to admins, the user and their own manager.
+      responses:
+        "200":
+          description: The user.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/User" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    patch:
+      tags: [Users]
+      operationId: updateUser
+      summary: Edit a user
+      description: |
+        Admins may change any field. Managers may change only the name, email and job title of their own direct reports.
+        Integrity rules return 409: you can't change your own role, the last active admin can't be demoted, and a
+        manager with reports or projects (or an employee on current projects) can't change role until those are reassigned.
+        Salary changes are never blocked by budgets; projects they push over budget are flagged instead.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UserUpdate" }
+      responses:
+        "200":
+          description: Updated user.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/User" }
+        "400": { $ref: "#/components/responses/ValidationFailed" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+    put:
+      tags: [Users]
+      operationId: replaceUser
+      summary: Edit a user (PUT alias of PATCH)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UserUpdate" }
+      responses:
+        "200":
+          description: Updated user.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/User" }
+        "400": { $ref: "#/components/responses/ValidationFailed" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+  /api/users/{id}/reset-password:
+    parameters:
+      - $ref: "#/components/parameters/UserId"
+    post:
+      tags: [Users]
+      operationId: resetPassword
+      summary: Issue a new temporary password (admin)
+      responses:
+        "200":
+          description: The new temporary password, shown once. The user must replace it at next sign-in.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [temporary_password]
+                properties:
+                  temporary_password: { type: string }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /api/users/{id}/deactivate:
+    parameters:
+      - $ref: "#/components/parameters/UserId"
+    post:
+      tags: [Users]
+      operationId: deactivateUser
+      summary: Deactivate a user (admin)
+      description: Users are never deleted. 409 if it's your own account, the last admin, or they still have reports, projects or current assignments.
+      responses:
+        "200":
+          description: Deactivated user.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/User" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+  /api/users/{id}/reactivate:
+    parameters:
+      - $ref: "#/components/parameters/UserId"
+    post:
+      tags: [Users]
+      operationId: reactivateUser
+      summary: Reactivate a user (admin)
+      responses:
+        "200":
+          description: Reactivated user.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/User" }
+        "400": { $ref: "#/components/responses/ValidationFailed" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+
+  # ------------------------------------------------------------------ projects
+  /api/projects:
+    get:
+      tags: [Projects]
+      operationId: listProjects
+      summary: List the projects you can see
+      description: Admins see all projects, managers the ones they manage, employees the current projects they're assigned to. Newest start date first.
+      parameters:
+        - { name: q, in: query, schema: { type: string }, description: Matches name or description. }
+        - { name: status, in: query, schema: { $ref: "#/components/schemas/ProjectStatus" } }
+        - { name: manager_id, in: query, schema: { type: integer, minimum: 1 } }
+        - name: archived
+          in: query
+          schema: { type: string, enum: ["false", "true", all], default: "false" }
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/PageSize"
+      responses:
+        "200":
+          description: One page of projects.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, total]
+                properties:
+                  items: { type: array, items: { $ref: "#/components/schemas/Project" } }
+                  total: { type: integer }
+        "400": { $ref: "#/components/responses/ValidationFailed" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+    post:
+      tags: [Projects]
+      operationId: createProject
+      summary: Create a project (admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ProjectCreate" }
+            example:
+              name: Payments platform refresh
+              description: Replace the legacy settlement batch.
+              start_date: "2026-11-02"
+              predicted_end_date: "2027-03-26"
+              budget: 250000
+              status: planned
+              manager_id: 2
+      responses:
+        "201":
+          description: Created project.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Project" }
+        "400": { $ref: "#/components/responses/ValidationFailed" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+  /api/projects/{id}:
+    parameters:
+      - $ref: "#/components/parameters/ProjectId"
+    get:
+      tags: [Projects]
+      operationId: getProject
+      summary: View a project
+      responses:
+        "200":
+          description: The project, with budget figures and rule-based insights.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Project" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    patch:
+      tags: [Projects]
+      operationId: updateProject
+      summary: Edit a project
+      description: |
+        Admins may change everything. Managers may change the description, dates, budget and status of projects they manage.
+        409 if the change would put the project over budget (lowering the budget, extending dates) or push a team
+        member over 40 hours, or if the project is archived.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ProjectUpdate" }
+      responses:
+        "200":
+          description: Updated project.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Project" }
+        "400": { $ref: "#/components/responses/ValidationFailed" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+    put:
+      tags: [Projects]
+      operationId: replaceProject
+      summary: Edit a project (PUT alias of PATCH)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ProjectUpdate" }
+      responses:
+        "200":
+          description: Updated project.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Project" }
+        "400": { $ref: "#/components/responses/ValidationFailed" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+  /api/projects/{id}/archive:
+    parameters:
+      - $ref: "#/components/parameters/ProjectId"
+    post:
+      tags: [Projects]
+      operationId: archiveProject
+      summary: Archive a project (admin)
+      description: The project and its history are kept and become read-only. Archived projects are hidden from employees.
+      responses:
+        "200":
+          description: Archived project.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Project" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+  /api/projects/{id}/reactivate:
+    parameters:
+      - $ref: "#/components/parameters/ProjectId"
+    post:
+      tags: [Projects]
+      operationId: reactivateProject
+      summary: Reactivate an archived project (admin)
+      description: If the old manager is no longer active, pass `manager_id` to choose a new one (otherwise 409).
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                manager_id: { type: integer, minimum: 1 }
+      responses:
+        "200":
+          description: Reactivated project.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Project" }
+        "400": { $ref: "#/components/responses/ValidationFailed" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+
+  # ------------------------------------------------------------------ staffing
+  /api/projects/{id}/assignments:
+    parameters:
+      - $ref: "#/components/parameters/ProjectId"
+    get:
+      tags: [Staffing]
+      operationId: listAssignments
+      summary: The project team
+      description: Anyone who can see the project. `cost` is omitted for employees.
+      responses:
+        "200":
+          description: Team members, by last name.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: { type: array, items: { $ref: "#/components/schemas/Assignment" } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    post:
+      tags: [Staffing]
+      operationId: createAssignment
+      summary: Assign an employee
+      description: |
+        Admin or the project's manager. If the caller isn't the employee's own manager (admins included), the
+        assignment is created as **pending** for that manager to approve, and its hours are reserved now.
+        409 if the employee is already on the project, would exceed 40 h in any week, or the cost would exceed the budget.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [user_id, hours_per_week]
+              properties:
+                user_id: { type: integer, minimum: 1 }
+                hours_per_week: { $ref: "#/components/schemas/HoursPerWeek" }
+            example: { user_id: 3, hours_per_week: 10 }
+      responses:
+        "201":
+          description: The assignment (`status` is `approved` or `pending`).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Assignment" }
+        "400": { $ref: "#/components/responses/ValidationFailed" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409":
+          description: Already on the project, over 40 hours, over budget, or the project is archived.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+              example:
+                error:
+                  code: conflict
+                  message: "This change would put the project $4,200.00 over budget (projected labour cost $54,200.00, budget $50,000.00)."
+  /api/projects/{id}/staffing-options:
+    parameters:
+      - $ref: "#/components/parameters/ProjectId"
+    get:
+      tags: [Staffing]
+      operationId: listStaffingOptions
+      summary: Employees available for this project
+      description: Admin or the project's manager. Each active employee's free hours during the project, the cost of one hour a week, and whether approval would be needed.
+      responses:
+        "200":
+          description: Active employees.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: { type: array, items: { $ref: "#/components/schemas/StaffingOption" } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /api/projects/{id}/assignments/{assignment_id}:
+    parameters:
+      - $ref: "#/components/parameters/ProjectId"
+      - $ref: "#/components/parameters/AssignmentId"
+    patch:
+      tags: [Staffing]
+      operationId: updateAssignment
+      summary: Change hours per week
+      description: |
+        Reductions apply immediately and cancel any pending increase. Increases by anyone other than the employee's
+        own manager become a pending request.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AssignmentUpdate" }
+      responses:
+        "200":
+          description: Updated assignment.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Assignment" }
+        "400": { $ref: "#/components/responses/ValidationFailed" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+    put:
+      tags: [Staffing]
+      operationId: replaceAssignment
+      summary: Change hours per week (PUT alias of PATCH)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AssignmentUpdate" }
+      responses:
+        "200":
+          description: Updated assignment.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Assignment" }
+        "400": { $ref: "#/components/responses/ValidationFailed" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+    delete:
+      tags: [Staffing]
+      operationId: deleteAssignment
+      summary: Remove an employee from the project
+      description: Also cancels any pending request and unassigns their open tasks on this project.
+      responses:
+        "204": { description: Removed. }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+
+  # ------------------------------------------------------------------ approvals
+  /api/projects/approvals:
+    get:
+      tags: [Approvals]
+      operationId: listApprovals
+      summary: Hours waiting for my approval (manager)
+      description: Pending requests for the caller's direct reports, oldest first.
+      responses:
+        "200":
+          description: Pending requests.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, total]
+                properties:
+                  items: { type: array, items: { $ref: "#/components/schemas/ApprovalRequest" } }
+                  total: { type: integer }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+  /api/projects/{id}/assignments/{assignment_id}/approve:
+    parameters:
+      - $ref: "#/components/parameters/ProjectId"
+      - $ref: "#/components/parameters/AssignmentId"
+    post:
+      tags: [Approvals]
+      operationId: approveHours
+      summary: Approve a pending assignment or increase
+      description: Only the employee's own reporting manager; not admins, not the project's manager (403, audited).
+      responses:
+        "200":
+          description: The approved assignment.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Assignment" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+  /api/projects/{id}/assignments/{assignment_id}/reject:
+    parameters:
+      - $ref: "#/components/parameters/ProjectId"
+      - $ref: "#/components/parameters/AssignmentId"
+    post:
+      tags: [Approvals]
+      operationId: rejectHours
+      summary: Reject a pending assignment or increase
+      description: A new assignment is withdrawn (`removed` is true); an increase is dropped and the confirmed hours stay.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                note: { type: string, maxLength: 1000, description: Kept in the audit entry. }
+      responses:
+        "200":
+          description: Outcome of the rejection.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [assignment, removed]
+                properties:
+                  assignment:
+                    type: object
+                    allOf: [{ $ref: "#/components/schemas/Assignment" }]
+                    nullable: true
+                    description: The remaining assignment, or null if it was removed.
+                  removed: { type: boolean }
+        "400": { $ref: "#/components/responses/ValidationFailed" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+
+  # ------------------------------------------------------------------ milestones
+  /api/projects/{id}/milestones:
+    parameters:
+      - $ref: "#/components/parameters/ProjectId"
+    get:
+      tags: [Milestones]
+      operationId: listMilestones
+      summary: Milestones with their tasks
+      description: In start-date order, with dependency and tracking flags, each milestone's task checklist and a progress summary.
+      responses:
+        "200":
+          description: Milestones and summary.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, summary]
+                properties:
+                  items: { type: array, items: { $ref: "#/components/schemas/Milestone" } }
+                  summary: { $ref: "#/components/schemas/MilestoneSummary" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    post:
+      tags: [Milestones]
+      operationId: createMilestone
+      summary: Add a milestone
+      description: |
+        Admin or the project's manager. A milestone starts on or after the project start and after every milestone it
+        depends on is due (400). It can't be in progress or completed until its dependencies are completed (409).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/MilestoneCreate" }
+            example: { title: Design, start_date: "2026-11-02", due_date: "2026-11-20", depends_on: [] }
+      responses:
+        "201":
+          description: Created milestone.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Milestone" }
+        "400": { $ref: "#/components/responses/ValidationFailed" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+  /api/projects/{id}/milestones/{milestone_id}:
+    parameters:
+      - $ref: "#/components/parameters/ProjectId"
+      - $ref: "#/components/parameters/MilestoneId"
+    patch:
+      tags: [Milestones]
+      operationId: updateMilestone
+      summary: Edit a milestone, its status or dependencies
+      description: |
+        409 when the change would create a circular dependency, start work before dependencies are completed,
+        reopen a milestone whose dependents have started, move the due date past a dependent's start,
+        or complete a milestone that still has open tasks.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/MilestoneUpdate" }
+      responses:
+        "200":
+          description: Updated milestone.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Milestone" }
+        "400": { $ref: "#/components/responses/ValidationFailed" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+    put:
+      tags: [Milestones]
+      operationId: replaceMilestone
+      summary: Edit a milestone (PUT alias of PATCH)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/MilestoneUpdate" }
+      responses:
+        "200":
+          description: Updated milestone.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Milestone" }
+        "400": { $ref: "#/components/responses/ValidationFailed" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+    delete:
+      tags: [Milestones]
+      operationId: deleteMilestone
+      summary: Delete a milestone and its tasks
+      description: 409 while other milestones depend on it.
+      responses:
+        "204": { description: Deleted. }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+
+  # ------------------------------------------------------------------ tasks
+  /api/projects/{id}/milestones/{milestone_id}/tasks:
+    parameters:
+      - $ref: "#/components/parameters/ProjectId"
+      - $ref: "#/components/parameters/MilestoneId"
+    post:
+      tags: [Tasks]
+      operationId: createTask
+      summary: Add a task to a milestone
+      description: Admin or the project's manager. The assignee must be an approved member of the team (400). 409 if the milestone is completed.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/TaskCreate" }
+            example: { title: Write release notes, description: "", assignee_id: 3 }
+      responses:
+        "201":
+          description: Created task.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Task" }
+        "400": { $ref: "#/components/responses/ValidationFailed" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+  /api/projects/{id}/tasks/{task_id}:
+    parameters:
+      - $ref: "#/components/parameters/ProjectId"
+      - $ref: "#/components/parameters/TaskId"
+    patch:
+      tags: [Tasks]
+      operationId: updateTask
+      summary: Rename, re-describe or reassign a task
+      description: "`assignee_id: null` unassigns it."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/TaskUpdate" }
+      responses:
+        "200":
+          description: Updated task.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Task" }
+        "400": { $ref: "#/components/responses/ValidationFailed" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+    put:
+      tags: [Tasks]
+      operationId: replaceTask
+      summary: Edit a task (PUT alias of PATCH)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/TaskUpdate" }
+      responses:
+        "200":
+          description: Updated task.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Task" }
+        "400": { $ref: "#/components/responses/ValidationFailed" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+    delete:
+      tags: [Tasks]
+      operationId: deleteTask
+      summary: Delete a task
+      responses:
+        "204": { description: Deleted. }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+  /api/projects/{id}/tasks/{task_id}/complete:
+    parameters:
+      - $ref: "#/components/parameters/ProjectId"
+      - $ref: "#/components/parameters/TaskId"
+    post:
+      tags: [Tasks]
+      operationId: completeTask
+      summary: Tick a task off
+      description: |
+        The assignee, the project's manager or an admin (others get 403, audited).
+        409 while the task's milestone is still waiting on incomplete dependencies. Ticking a done task again is a no-op.
+      responses:
+        "200":
+          description: The task, now done.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Task" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+  /api/projects/{id}/tasks/{task_id}/reopen:
+    parameters:
+      - $ref: "#/components/parameters/ProjectId"
+      - $ref: "#/components/parameters/TaskId"
+    post:
+      tags: [Tasks]
+      operationId: reopenTask
+      summary: Undo ticking a task off
+      description: Same permissions as completing. 409 if the milestone is completed (reopen the milestone first).
+      responses:
+        "200":
+          description: The task, now open.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Task" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+
+  # ------------------------------------------------------------------ requests
+  /api/projects/requests:
+    get:
+      tags: [Requests]
+      operationId: listProjectRequests
+      summary: Project requests
+      description: Admins see every request; managers see their own. Pending first, then newest.
+      parameters:
+        - { name: status, in: query, schema: { $ref: "#/components/schemas/RequestStatus" } }
+      responses:
+        "200":
+          description: Requests.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, total, pending]
+                properties:
+                  items: { type: array, items: { $ref: "#/components/schemas/ProjectRequest" } }
+                  total: { type: integer }
+                  pending: { type: integer, description: "Pending requests visible to the caller, regardless of the status filter." }
+        "400": { $ref: "#/components/responses/ValidationFailed" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+    post:
+      tags: [Requests]
+      operationId: submitProjectRequest
+      summary: Request a new project (manager)
+      description: The requesting manager will manage the project if it's approved.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ProjectRequestCreate" }
+      responses:
+        "201":
+          description: The pending request.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ProjectRequest" }
+        "400": { $ref: "#/components/responses/ValidationFailed" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+  /api/projects/requests/{request_id}/withdraw:
+    parameters:
+      - $ref: "#/components/parameters/RequestId"
+    post:
+      tags: [Requests]
+      operationId: withdrawProjectRequest
+      summary: Withdraw your own pending request (manager)
+      responses:
+        "200":
+          description: The withdrawn request.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ProjectRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+  /api/projects/requests/{request_id}/approve:
+    parameters:
+      - $ref: "#/components/parameters/RequestId"
+    post:
+      tags: [Requests]
+      operationId: approveProjectRequest
+      summary: Approve a request and create the project (admin)
+      description: Optionally adjust the name, dates, budget or manager. The project is created in the same transaction, with the same rules as "New project".
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ProjectRequestApprove" }
+      responses:
+        "200":
+          description: The approved request, with `project_id` set.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ProjectRequest" }
+        "400": { $ref: "#/components/responses/ValidationFailed" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+  /api/projects/requests/{request_id}/reject:
+    parameters:
+      - $ref: "#/components/parameters/RequestId"
+    post:
+      tags: [Requests]
+      operationId: rejectProjectRequest
+      summary: Reject a request (admin)
+      description: A reason is required so the manager knows why.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [note]
+              properties:
+                note: { type: string, minLength: 1, maxLength: 1000 }
+      responses:
+        "200":
+          description: The rejected request.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ProjectRequest" }
+        "400": { $ref: "#/components/responses/ValidationFailed" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+
+  # ------------------------------------------------------------------ dashboard
+  /api/projects/dashboard:
+    get:
+      tags: [Dashboard]
+      operationId: getDashboard
+      summary: The signed-in user's dashboard
+      description: The shape depends on `role`.
+      responses:
+        "200":
+          description: Dashboard for the caller's role.
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: "#/components/schemas/AdminDashboard"
+                  - $ref: "#/components/schemas/ManagerDashboard"
+                  - $ref: "#/components/schemas/EmployeeDashboard"
+                discriminator:
+                  propertyName: role
+                  mapping:
+                    admin: "#/components/schemas/AdminDashboard"
+                    manager: "#/components/schemas/ManagerDashboard"
+                    employee: "#/components/schemas/EmployeeDashboard"
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  # ------------------------------------------------------------------ audit
+  /api/audit:
+    get:
+      tags: [Audit]
+      operationId: listAuditEntries
+      summary: Search the audit log
+      description: |
+        Admins see every entry. Managers see their own entries, their current direct reports' entries, and failed
+        sign-ins against those accounts; never other managers' or admins'. Employees get 403. Newest first.
+      parameters:
+        - { name: q, in: query, schema: { type: string }, description: "Matches the summary, actor name or actor employee ID." }
+        - { name: actor, in: query, schema: { type: string }, description: Actor's employee ID (case-insensitive). }
+        - { name: role, in: query, schema: { $ref: "#/components/schemas/Role" }, description: Actor's role at the time. }
+        - { name: action, in: query, schema: { type: string, example: task.complete } }
+        - { name: entity_type, in: query, schema: { type: string, example: project } }
+        - { name: outcome, in: query, schema: { type: string, enum: [success, denied] } }
+        - { name: project_id, in: query, schema: { type: integer, minimum: 1 } }
+        - { name: from, in: query, schema: { type: string, format: date }, description: On or after this day. }
+        - { name: to, in: query, schema: { type: string, format: date }, description: On or before this day. }
+        - { name: page, in: query, schema: { type: integer, minimum: 1, default: 1 } }
+        - { name: page_size, in: query, schema: { type: integer, minimum: 1, maximum: 200, default: 50 } }
+      responses:
+        "200":
+          description: One page of entries.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, total]
+                properties:
+                  items: { type: array, items: { $ref: "#/components/schemas/AuditEntry" } }
+                  total: { type: integer }
+        "400": { $ref: "#/components/responses/ValidationFailed" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+  /api/audit/actions:
+    get:
+      tags: [Audit]
+      operationId: listAuditActions
+      summary: Action names you can see (for filter menus)
+      responses:
+        "200":
+          description: Distinct action names, alphabetical.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: { type: array, items: { type: string }, example: [auth.login, project.create, task.complete] }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+  # ------------------------------------------------------------------ monitor
+  /api/monitor/run:
+    post:
+      tags: [Monitor]
+      operationId: runBudgetCheck
+      summary: Run the budget check now (admin)
+      description: |
+        Recomputes every current project's projected labour cost. Projects that newly went over budget, or came back
+        within it, are recorded in the audit log as "Budget monitor". The same check runs every hour on a schedule.
+      responses:
+        "200":
+          description: What the check found.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/BudgetCheckResult" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: The `access_token` from login or refresh (valid for 15 minutes).
+
+  parameters:
+    Page:
+      name: page
+      in: query
+      schema: { type: integer, minimum: 1, default: 1 }
+    PageSize:
+      name: page_size
+      in: query
+      schema: { type: integer, minimum: 1, maximum: 100, default: 25 }
+    UserId:
+      name: id
+      in: path
+      required: true
+      schema: { type: integer, minimum: 1 }
+    ProjectId:
+      name: id
+      in: path
+      required: true
+      description: Project ID.
+      schema: { type: integer, minimum: 1 }
+    AssignmentId:
+      name: assignment_id
+      in: path
+      required: true
+      schema: { type: integer, minimum: 1 }
+    MilestoneId:
+      name: milestone_id
+      in: path
+      required: true
+      schema: { type: integer, minimum: 1 }
+    TaskId:
+      name: task_id
+      in: path
+      required: true
+      schema: { type: integer, minimum: 1 }
+    RequestId:
+      name: request_id
+      in: path
+      required: true
+      schema: { type: integer, minimum: 1 }
+
+  responses:
+    ValidationFailed:
+      description: The request body or query failed validation. `details` names each problem field.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+          example:
+            error:
+              code: validation_error
+              message: Validation failed
+              details: { email: Must be a valid email address, salary: This field is required }
+    Unauthorized:
+      description: Missing, invalid or expired access token (`token_expired` tells the client to refresh).
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+          example: { error: { code: unauthorized, message: Authentication required } }
+    Forbidden:
+      description: |
+        Signed in but not allowed. Refused attempts to change data are recorded in the audit log.
+        `password_change_required` means the user must replace a temporary password first.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+          example: { error: { code: forbidden, message: You do not have permission to perform this action } }
+    NotFound:
+      description: Doesn't exist, or isn't visible to you.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+          example: { error: { code: not_found, message: Project not found } }
+    Conflict:
+      description: A business rule refused the change; `message` explains which and why.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+          example:
+            error:
+              code: conflict
+              message: "Cannot mark as completed: 2 task(s) still open. Tick them off or remove them first."
+              details: { status: Open tasks remain }
+
+  schemas:
+    # ---------------------------------------------------------------- shared
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code:
+              type: string
+              enum:
+                - validation_error
+                - bad_request
+                - unauthorized
+                - token_expired
+                - forbidden
+                - password_change_required
+                - not_found
+                - method_not_allowed
+                - conflict
+                - too_many_attempts
+                - internal_error
+            message: { type: string, description: "Readable explanation, safe to show to the user." }
+            details:
+              type: object
+              additionalProperties: true
+              description: "Field name -> message for validation errors; `request_id` for internal errors."
+    Role:
+      type: string
+      enum: [admin, manager, employee]
+    ProjectStatus:
+      type: string
+      enum: [planned, active, on_hold, completed]
+    MilestoneStatus:
+      type: string
+      enum: [not_started, in_progress, completed, blocked]
+    RequestStatus:
+      type: string
+      enum: [pending, approved, rejected, withdrawn]
+    HoursPerWeek:
+      type: number
+      minimum: 0.5
+      maximum: 40
+      example: 10
+    Insight:
+      type: object
+      description: A rule-based (not AI) flag about a project. Budget-related insights are hidden from employees.
+      required: [code, severity, message]
+      properties:
+        code:
+          type: string
+          enum:
+            - over_budget
+            - budget_at_risk
+            - milestones_overdue
+            - past_predicted_end
+            - milestones_past_end
+            - no_team
+            - no_milestones
+            - hours_awaiting_approval
+        severity: { type: string, enum: [error, warning, info] }
+        message: { type: string, example: 92% of the budget is already committed. }
+    Health:
+      type: object
+      required: [status, database, schema_version]
+      properties:
+        status: { type: string, example: ok }
+        database: { type: string, example: ok }
+        schema_version: { type: integer, example: 7, description: Latest applied database migration. }
+
+    # ---------------------------------------------------------------- auth
+    LoginRequest:
+      type: object
+      additionalProperties: false
+      required: [employee_id, password]
+      properties:
+        employee_id: { type: string, maxLength: 20, example: MM4R8T }
+        password: { type: string, maxLength: 128, format: password }
+    TokenBundle:
+      type: object
+      required: [access_token, refresh_token, expires_in, user]
+      properties:
+        access_token: { type: string, description: JWT for the Authorization header. }
+        refresh_token: { type: string, description: JWT for POST /api/auth/refresh. }
+        expires_in: { type: integer, example: 900, description: Access token lifetime in seconds. }
+        user: { $ref: "#/components/schemas/CurrentUser" }
+    CurrentUser:
+      type: object
+      required: [id, employee_id, first_name, last_name, email, job_title, role, manager_id, must_change_password]
+      properties:
+        id: { type: integer }
+        employee_id: { type: string, example: MM4R8T }
+        first_name: { type: string }
+        last_name: { type: string }
+        email: { type: string, format: email }
+        job_title: { type: string }
+        role: { $ref: "#/components/schemas/Role" }
+        manager_id: { type: integer, nullable: true, description: Reporting manager (employees only). }
+        must_change_password: { type: boolean, description: True until a temporary password is replaced. }
+
+    # ---------------------------------------------------------------- users
+    User:
+      type: object
+      required: [id, employee_id, first_name, last_name, email, job_title, role, manager_id, salary, is_active, created_at]
+      properties:
+        id: { type: integer }
+        employee_id: { type: string, example: EE3H9W }
+        first_name: { type: string }
+        last_name: { type: string }
+        email: { type: string, format: email }
+        job_title: { type: string }
+        role: { $ref: "#/components/schemas/Role" }
+        manager_id: { type: integer, nullable: true }
+        manager_name: { type: string, nullable: true }
+        manager_employee_id: { type: string, nullable: true }
+        salary:
+          type: number
+          nullable: true
+          description: Annual salary. Null unless you are an admin, this user, or their manager.
+        is_active: { type: boolean }
+        created_at: { type: string, format: date-time }
+    UserCreate:
+      type: object
+      additionalProperties: false
+      required: [first_name, last_name, email, salary, role]
+      properties:
+        first_name: { type: string, maxLength: 100 }
+        last_name: { type: string, maxLength: 100 }
+        email: { type: string, format: email, maxLength: 254, description: Must be unique (case-insensitive). }
+        job_title: { type: string, maxLength: 120 }
+        salary: { type: number, minimum: 0, maximum: 10000000 }
+        role: { $ref: "#/components/schemas/Role" }
+        manager_id:
+          type: integer
+          nullable: true
+          minimum: 1
+          description: Required for employees (an active manager); must be absent or null for other roles.
+    UserUpdate:
+      type: object
+      additionalProperties: false
+      description: Managers may send only first_name, last_name, email and job_title, for their direct reports.
+      properties:
+        first_name: { type: string, maxLength: 100 }
+        last_name: { type: string, maxLength: 100 }
+        email: { type: string, format: email, maxLength: 254 }
+        job_title: { type: string, maxLength: 120 }
+        salary: { type: number, minimum: 0, maximum: 10000000 }
+        role: { $ref: "#/components/schemas/Role" }
+        manager_id: { type: integer, nullable: true, minimum: 1 }
+    ProfileUpdate:
+      type: object
+      additionalProperties: false
+      properties:
+        first_name: { type: string, maxLength: 100 }
+        last_name: { type: string, maxLength: 100 }
+        email: { type: string, format: email, maxLength: 254 }
+
+    # ---------------------------------------------------------------- projects
+    Project:
+      type: object
+      required:
+        - id
+        - name
+        - description
+        - start_date
+        - predicted_end_date
+        - working_days
+        - capacity_hours
+        - manager_id
+        - manager_name
+        - manager_employee_id
+        - budget
+        - status
+        - is_archived
+        - archived_at
+        - team_size
+        - allocated_hours
+        - my_hours_per_week
+        - my_pending_hours
+        - milestones
+        - insights
+        - created_at
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        description: { type: string }
+        start_date: { type: string, format: date }
+        predicted_end_date: { type: string, format: date }
+        working_days: { type: integer, description: "Weekdays from start to predicted end, inclusive." }
+        capacity_hours: { type: number, description: "working_days x 8" }
+        manager_id: { type: integer }
+        manager_name: { type: string }
+        manager_employee_id: { type: string }
+        budget: { type: number, nullable: true, description: Null for employees. }
+        projected_cost:
+          type: number
+          description: "Projected labour cost: sum over the team of hours/week x weeks x salary / 2080. Omitted for employees."
+        remaining_budget: { type: number, description: Omitted for employees. }
+        over_budget: { type: boolean, description: Omitted for employees. }
+        status: { $ref: "#/components/schemas/ProjectStatus" }
+        is_archived: { type: boolean }
+        archived_at: { type: string, format: date-time, nullable: true }
+        team_size: { type: integer }
+        allocated_hours: { type: number, description: Hours per week reserved across the team (pending included). }
+        my_hours_per_week: { type: number, nullable: true, description: The caller's confirmed hours on this project. }
+        my_pending_hours: { type: number, nullable: true, description: The caller's hours awaiting approval. }
+        milestones:
+          type: object
+          required: [total, completed, overdue]
+          properties:
+            total: { type: integer }
+            completed: { type: integer }
+            overdue: { type: integer }
+        insights: { type: array, items: { $ref: "#/components/schemas/Insight" } }
+        created_at: { type: string, format: date-time }
+    ProjectCreate:
+      type: object
+      additionalProperties: false
+      required: [name, start_date, predicted_end_date, budget, manager_id]
+      properties:
+        name: { type: string, maxLength: 200 }
+        description: { type: string, maxLength: 5000 }
+        start_date: { type: string, format: date }
+        predicted_end_date: { type: string, format: date, description: On or after start_date. }
+        budget: { type: number, minimum: 0, maximum: 1000000000 }
+        status: { allOf: [{ $ref: "#/components/schemas/ProjectStatus" }], default: planned }
+        manager_id: { type: integer, minimum: 1, description: An active manager. }
+    ProjectUpdate:
+      type: object
+      additionalProperties: false
+      description: Managers may not send name or manager_id.
+      properties:
+        name: { type: string, maxLength: 200 }
+        description: { type: string, maxLength: 5000 }
+        start_date: { type: string, format: date }
+        predicted_end_date: { type: string, format: date }
+        budget: { type: number, minimum: 0, maximum: 1000000000 }
+        status: { $ref: "#/components/schemas/ProjectStatus" }
+        manager_id: { type: integer, minimum: 1 }
+
+    # ---------------------------------------------------------------- staffing
+    Assignment:
+      type: object
+      required:
+        - id
+        - user_id
+        - employee_id
+        - first_name
+        - last_name
+        - job_title
+        - status
+        - hours_per_week
+        - pending_hours
+        - reserved_hours
+        - awaiting_approval
+        - approver_name
+        - requested_by_name
+        - requested_at
+        - total_hours
+      properties:
+        id: { type: integer }
+        user_id: { type: integer }
+        employee_id: { type: string }
+        first_name: { type: string }
+        last_name: { type: string }
+        job_title: { type: string }
+        status: { type: string, enum: [approved, pending], description: "pending = a new assignment awaiting approval." }
+        hours_per_week: { type: number, nullable: true, description: Confirmed hours (null while a new assignment awaits approval). }
+        pending_hours: { type: number, nullable: true, description: Hours awaiting approval (new assignment or increase). }
+        reserved_hours: { type: number, description: What counts against the 40-hour and budget rules. }
+        awaiting_approval: { type: boolean }
+        approver_name: { type: string, nullable: true, description: The employee's own manager. }
+        requested_by_name: { type: string, nullable: true }
+        requested_at: { type: string, format: date-time, nullable: true }
+        total_hours: { type: number, description: reserved_hours x weeks in the project. }
+        cost: { type: number, description: Projected cost of this assignment. Omitted for employees. }
+    AssignmentUpdate:
+      type: object
+      additionalProperties: false
+      required: [hours_per_week]
+      properties:
+        hours_per_week: { $ref: "#/components/schemas/HoursPerWeek" }
+    StaffingOption:
+      type: object
+      required:
+        - user_id
+        - employee_id
+        - first_name
+        - last_name
+        - job_title
+        - manager_name
+        - needs_approval
+        - assignment_id
+        - assigned_hours
+        - committed_hours_elsewhere
+        - available_hours
+        - cost_per_weekly_hour
+      properties:
+        user_id: { type: integer }
+        employee_id: { type: string }
+        first_name: { type: string }
+        last_name: { type: string }
+        job_title: { type: string }
+        manager_name: { type: string, nullable: true }
+        needs_approval: { type: boolean, description: True if the caller isn't this employee's own manager. }
+        assignment_id: { type: integer, nullable: true, description: Set if already on this project. }
+        assigned_hours: { type: number, nullable: true }
+        committed_hours_elsewhere: { type: number, description: Peak weekly hours on other current projects during this one. }
+        available_hours: { type: number }
+        cost_per_weekly_hour: { type: number, description: Cost of 1 hour/week for the whole project (4 decimal places). }
+    ApprovalRequest:
+      type: object
+      required:
+        - assignment_id
+        - project_id
+        - project_name
+        - project_manager_name
+        - start_date
+        - predicted_end_date
+        - user_id
+        - employee_id
+        - first_name
+        - last_name
+        - job_title
+        - kind
+        - current_hours
+        - requested_hours
+        - requested_by_name
+        - requested_at
+      properties:
+        assignment_id: { type: integer }
+        project_id: { type: integer }
+        project_name: { type: string }
+        project_manager_name: { type: string }
+        start_date: { type: string, format: date }
+        predicted_end_date: { type: string, format: date }
+        user_id: { type: integer }
+        employee_id: { type: string }
+        first_name: { type: string }
+        last_name: { type: string }
+        job_title: { type: string }
+        kind: { type: string, enum: [new, increase] }
+        current_hours: { type: number, nullable: true, description: Null for a new assignment. }
+        requested_hours: { type: number }
+        requested_by_name: { type: string, nullable: true }
+        requested_at: { type: string, format: date-time, nullable: true }
+
+    # ---------------------------------------------------------------- milestones and tasks
+    MilestoneRef:
+      type: object
+      required: [id, title]
+      properties:
+        id: { type: integer }
+        title: { type: string }
+    Milestone:
+      type: object
+      required:
+        - id
+        - title
+        - description
+        - start_date
+        - due_date
+        - status
+        - completed_at
+        - depends_on
+        - dependents
+        - blocked_by
+        - can_start
+        - overdue
+        - past_project_end
+        - tasks
+        - tasks_total
+        - tasks_done
+      properties:
+        id: { type: integer }
+        title: { type: string }
+        description: { type: string }
+        start_date: { type: string, format: date }
+        due_date: { type: string, format: date }
+        status: { $ref: "#/components/schemas/MilestoneStatus" }
+        completed_at: { type: string, format: date-time, nullable: true }
+        depends_on: { type: array, items: { $ref: "#/components/schemas/MilestoneRef" } }
+        dependents: { type: array, items: { $ref: "#/components/schemas/MilestoneRef" }, description: Milestones that depend on this one. }
+        blocked_by: { type: array, items: { type: string }, description: Titles of dependencies not yet completed. }
+        can_start: { type: boolean }
+        overdue: { type: boolean }
+        past_project_end: { type: boolean, description: "Due after the project's predicted end (allowed, but flagged)." }
+        tasks: { type: array, items: { $ref: "#/components/schemas/Task" } }
+        tasks_total: { type: integer }
+        tasks_done: { type: integer }
+    MilestoneSummary:
+      type: object
+      required: [total, completed, overdue, percent_complete, tasks_total, tasks_done]
+      properties:
+        total: { type: integer }
+        completed: { type: integer }
+        overdue: { type: integer }
+        percent_complete: { type: integer, minimum: 0, maximum: 100, description: Share of milestones completed. }
+        tasks_total: { type: integer }
+        tasks_done: { type: integer }
+    MilestoneCreate:
+      type: object
+      additionalProperties: false
+      required: [title, start_date, due_date]
+      properties:
+        title: { type: string, maxLength: 200 }
+        description: { type: string, maxLength: 5000 }
+        start_date: { type: string, format: date }
+        due_date: { type: string, format: date }
+        status: { allOf: [{ $ref: "#/components/schemas/MilestoneStatus" }], default: not_started }
+        depends_on:
+          type: array
+          maxItems: 50
+          items: { type: integer }
+          description: IDs of other milestones in this project.
+    MilestoneUpdate:
+      type: object
+      additionalProperties: false
+      properties:
+        title: { type: string, maxLength: 200 }
+        description: { type: string, maxLength: 5000 }
+        start_date: { type: string, format: date }
+        due_date: { type: string, format: date }
+        status: { $ref: "#/components/schemas/MilestoneStatus" }
+        depends_on: { type: array, maxItems: 50, items: { type: integer }, description: Replaces the whole list. }
+    Task:
+      type: object
+      required: [id, milestone_id, title, description, assignee, done, completed_at, completed_by_name, can_tick, waiting_on]
+      properties:
+        id: { type: integer }
+        milestone_id: { type: integer }
+        title: { type: string }
+        description: { type: string }
+        assignee:
+          type: object
+          nullable: true
+          required: [id, name, employee_id]
+          properties:
+            id: { type: integer }
+            name: { type: string }
+            employee_id: { type: string }
+        done: { type: boolean }
+        completed_at: { type: string, format: date-time, nullable: true }
+        completed_by_name: { type: string, nullable: true }
+        can_tick: { type: boolean, description: Whether the caller may tick this task off or reopen it. }
+        waiting_on:
+          type: array
+          items: { type: string }
+          description: Incomplete dependencies of the milestone; the task can't be ticked until this is empty.
+    TaskCreate:
+      type: object
+      additionalProperties: false
+      required: [title]
+      properties:
+        title: { type: string, maxLength: 200 }
+        description: { type: string, maxLength: 5000 }
+        assignee_id: { type: integer, nullable: true, description: An approved member of the project's team. }
+    TaskUpdate:
+      type: object
+      additionalProperties: false
+      properties:
+        title: { type: string, maxLength: 200 }
+        description: { type: string, maxLength: 5000 }
+        assignee_id: { type: integer, nullable: true, description: Null unassigns. }
+
+    # ---------------------------------------------------------------- requests
+    ProjectRequest:
+      type: object
+      required:
+        - id
+        - name
+        - description
+        - start_date
+        - predicted_end_date
+        - budget
+        - justification
+        - status
+        - requested_by
+        - requested_by_name
+        - requested_by_employee_id
+        - created_at
+        - reviewed_by_name
+        - reviewed_at
+        - review_note
+        - project_id
+        - project_name
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        description: { type: string }
+        start_date: { type: string, format: date }
+        predicted_end_date: { type: string, format: date }
+        budget: { type: number }
+        justification: { type: string }
+        status: { $ref: "#/components/schemas/RequestStatus" }
+        requested_by: { type: integer }
+        requested_by_name: { type: string }
+        requested_by_employee_id: { type: string }
+        created_at: { type: string, format: date-time }
+        reviewed_by_name: { type: string, nullable: true }
+        reviewed_at: { type: string, format: date-time, nullable: true }
+        review_note: { type: string, nullable: true }
+        project_id: { type: integer, nullable: true, description: The project created on approval. }
+        project_name: { type: string, nullable: true }
+    ProjectRequestCreate:
+      type: object
+      additionalProperties: false
+      required: [name, start_date, predicted_end_date, budget, justification]
+      properties:
+        name: { type: string, maxLength: 200 }
+        description: { type: string, maxLength: 5000 }
+        start_date: { type: string, format: date }
+        predicted_end_date: { type: string, format: date }
+        budget: { type: number, minimum: 0, maximum: 1000000000 }
+        justification: { type: string, maxLength: 5000 }
+    ProjectRequestApprove:
+      type: object
+      additionalProperties: false
+      description: Every field is optional; anything sent replaces what was requested.
+      properties:
+        name: { type: string, maxLength: 200 }
+        start_date: { type: string, format: date }
+        predicted_end_date: { type: string, format: date }
+        budget: { type: number, minimum: 0, maximum: 1000000000 }
+        manager_id: { type: integer, minimum: 1, description: Defaults to the requesting manager. }
+        note: { type: string, maxLength: 1000 }
+
+    # ---------------------------------------------------------------- dashboard
+    DashboardProject:
+      type: object
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        status: { $ref: "#/components/schemas/ProjectStatus" }
+        manager_name: { type: string }
+        predicted_end_date: { type: string, format: date }
+        budget: { type: number, nullable: true }
+        projected_cost: { type: number, nullable: true }
+        over_budget: { type: boolean, nullable: true }
+        my_hours_per_week: { type: number, nullable: true }
+        my_pending_hours: { type: number, nullable: true }
+        insights: { type: array, items: { $ref: "#/components/schemas/Insight" } }
+        milestones:
+          type: object
+          properties:
+            total: { type: integer }
+            completed: { type: integer }
+            overdue: { type: integer }
+    AdminDashboard:
+      type: object
+      required: [role, stats, attention]
+      properties:
+        role: { type: string, enum: [admin] }
+        stats:
+          type: object
+          properties:
+            active_projects: { type: integer }
+            over_budget: { type: integer }
+            needing_attention: { type: integer }
+            pending_requests: { type: integer }
+            people:
+              type: object
+              properties:
+                admin: { type: integer }
+                manager: { type: integer }
+                employee: { type: integer }
+            total_budget: { type: number }
+            total_projected_cost: { type: number }
+        attention:
+          type: array
+          description: Up to 8 projects with error or warning insights, worst first.
+          items: { $ref: "#/components/schemas/DashboardProject" }
+    ManagerDashboard:
+      type: object
+      required: [role, stats, attention, projects, team]
+      properties:
+        role: { type: string, enum: [manager] }
+        stats:
+          type: object
+          properties:
+            my_projects: { type: integer }
+            needing_attention: { type: integer }
+            approvals_waiting: { type: integer }
+            my_pending_requests: { type: integer }
+        attention: { type: array, items: { $ref: "#/components/schemas/DashboardProject" } }
+        projects: { type: array, items: { $ref: "#/components/schemas/DashboardProject" } }
+        team:
+          type: array
+          description: Direct reports' reserved hours on projects running this week.
+          items:
+            type: object
+            properties:
+              id: { type: integer }
+              first_name: { type: string }
+              last_name: { type: string }
+              job_title: { type: string }
+              hours_this_week: { type: number }
+              capacity: { type: number, example: 40 }
+              available: { type: number }
+    EmployeeDashboard:
+      type: object
+      required: [role, stats, projects, upcoming_milestones, my_tasks]
+      properties:
+        role: { type: string, enum: [employee] }
+        stats:
+          type: object
+          properties:
+            hours_this_week: { type: number }
+            hours_awaiting_approval: { type: number }
+            capacity: { type: number, example: 40 }
+            my_projects: { type: integer }
+            open_tasks: { type: integer }
+        projects: { type: array, items: { $ref: "#/components/schemas/DashboardProject" } }
+        upcoming_milestones:
+          type: array
+          description: Up to 6 open milestones on my projects, soonest due first.
+          items:
+            type: object
+            properties:
+              id: { type: integer }
+              title: { type: string }
+              due_date: { type: string, format: date }
+              status: { $ref: "#/components/schemas/MilestoneStatus" }
+              project_id: { type: integer }
+              project_name: { type: string }
+              overdue: { type: boolean }
+        my_tasks:
+          type: array
+          description: Open tasks assigned to me, soonest milestone first.
+          items:
+            type: object
+            properties:
+              id: { type: integer }
+              title: { type: string }
+              milestone_id: { type: integer }
+              milestone_title: { type: string }
+              due_date: { type: string, format: date }
+              project_id: { type: integer }
+              project_name: { type: string }
+              waiting: { type: boolean, description: The milestone still waits on incomplete dependencies. }
+
+    # ---------------------------------------------------------------- audit and monitor
+    AuditEntry:
+      type: object
+      required:
+        - id
+        - occurred_at
+        - actor_id
+        - actor_employee_id
+        - actor_name
+        - actor_role
+        - action
+        - entity_type
+        - entity_id
+        - project_id
+        - project_name
+        - summary
+        - changes
+        - outcome
+      properties:
+        id: { type: integer }
+        occurred_at: { type: string, format: date-time }
+        actor_id: { type: integer, nullable: true, description: Null for failed sign-ins and the budget monitor. }
+        actor_employee_id: { type: string, nullable: true, description: "For a failed sign-in, the ID that was typed." }
+        actor_name: { type: string, nullable: true }
+        actor_role: { type: string, nullable: true, enum: [admin, manager, employee, null] }
+        action: { type: string, example: assignment.request }
+        entity_type: { type: string, example: assignment }
+        entity_id: { type: integer, nullable: true }
+        project_id: { type: integer, nullable: true }
+        project_name: { type: string, nullable: true }
+        summary: { type: string, example: Requested 10 h/week of Eli Employee on Payments (awaiting approval from Morgan Manager) }
+        changes:
+          type: object
+          nullable: true
+          description: "Field -> {from, to}. Salaries are shown as [redacted]; passwords are never recorded."
+          additionalProperties:
+            type: object
+            properties:
+              from: {}
+              to: {}
+        outcome: { type: string, enum: [success, denied] }
+    BudgetCheckResult:
+      type: object
+      required: [checked, newly_over_budget, back_within_budget, still_over_budget, ran_at]
+      properties:
+        checked: { type: integer, description: Current (not archived or completed) projects checked. }
+        newly_over_budget: { type: array, items: { type: string }, description: Project names. }
+        back_within_budget: { type: array, items: { type: string } }
+        still_over_budget: { type: integer }
+        ran_at: { type: string, format: date-time }

@@ -41,35 +41,15 @@ PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." > /dev/null 2>&1 || exit 1; pwd -P)"
 export E2E_BASE_URL="${E2E_BASE_URL:-$DEFAULT_URL}"
 
 if [ -z "${E2E_ADMIN_PASSWORD:-}" ] || [ -z "${E2E_MANAGER_PASSWORD:-}" ] || [ -z "${E2E_EMPLOYEE_PASSWORD:-}" ]; then
-    if [ ! -f "$PROJECT_ROOT/ENVIRONMENT.config" ]; then
-        echo "ERROR: ENVIRONMENT.config not found. Run ./bin/setup-participant.sh first."
-        exit 1
-    fi
-    # shellcheck disable=SC1091
-    source "$PROJECT_ROOT/ENVIRONMENT.config"
-    LOG_GROUP="/aws/lambda/${PROJECT_NAME}-health-${TF_VAR_aws_app_code}"
-
-    echo "INFO: Reading demo passwords from $LOG_GROUP (not printed)..."
-    if ! LOGS=$(aws logs tail "$LOG_GROUP" --since 30d --format short 2>/dev/null); then
-        echo "ERROR: Could not read CloudWatch. AWS credentials may have expired: run ./bin/setup-participant.sh"
-        exit 1
-    fi
-    LINE=$(echo "$LOGS" | grep "one-time passwords" | tail -1)
-
-    # The log may list the original IDs (ADM001...) or the current ones (AA7K2P...).
-    password_for() {
-        echo "$LINE" | grep -oE "($1|$2)=[A-Za-z0-9]{6}" | head -1 | cut -d= -f2
-    }
-    E2E_ADMIN_PASSWORD=$(password_for ADM001 AA7K2P)
-    E2E_MANAGER_PASSWORD=$(password_for MGR001 MM4R8T)
-    E2E_EMPLOYEE_PASSWORD=$(password_for EMP001 EE3H9W)
-    export E2E_ADMIN_PASSWORD E2E_MANAGER_PASSWORD E2E_EMPLOYEE_PASSWORD
-
-    if [ -z "$E2E_ADMIN_PASSWORD" ] || [ -z "$E2E_MANAGER_PASSWORD" ] || [ -z "$E2E_EMPLOYEE_PASSWORD" ]; then
-        echo "ERROR: Demo passwords not found in the last 30 days of $LOG_GROUP."
+    # shellcheck source=demo-passwords.sh
+    source "$SCRIPT_DIR/demo-passwords.sh"
+    if ! load_demo_passwords "$PROJECT_ROOT"; then
         echo "       Set E2E_ADMIN_PASSWORD, E2E_MANAGER_PASSWORD and E2E_EMPLOYEE_PASSWORD yourself."
         exit 1
     fi
+    export E2E_ADMIN_PASSWORD="$DEMO_ADMIN_PASSWORD"
+    export E2E_MANAGER_PASSWORD="$DEMO_MANAGER_PASSWORD"
+    export E2E_EMPLOYEE_PASSWORD="$DEMO_EMPLOYEE_PASSWORD"
 fi
 
 echo "INFO: Running E2E journeys against $E2E_BASE_URL"

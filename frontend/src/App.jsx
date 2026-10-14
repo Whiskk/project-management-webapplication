@@ -1,4 +1,4 @@
-import { lazy } from 'react';
+import { lazy, useEffect } from 'react';
 import { Route, Routes } from 'react-router';
 import RequireAuth from './auth/RequireAuth';
 import RequirePermission from './auth/RequirePermission';
@@ -18,10 +18,17 @@ const ProjectsPage = lazy(() => import('./pages/ProjectsPage'));
 const RequestsPage = lazy(() => import('./pages/RequestsPage'));
 const UsersPage = lazy(() => import('./pages/UsersPage'));
 
+// The API reference is a static page (public/api-docs.html, Swagger UI) outside the React app.
+function ApiDocsRedirect() {
+  useEffect(() => window.location.replace('/api-docs.html'), []);
+  return null;
+}
+
 export default function App() {
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
+      <Route path="/api-docs" element={<ApiDocsRedirect />} />
       <Route element={<RequireAuth />}>
         <Route path="change-password" element={<ChangePasswordPage />} />
         <Route element={<AppShell />}>

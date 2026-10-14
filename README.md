@@ -5,6 +5,7 @@ A project-management web app for **Admins, Managers and Employees**: create and 
 Built for the Citi Coding Workshop (Full Stack track) on the required stack: **React + Material UI + React Responsive → Python AWS Lambdas → PostgreSQL**, deployed to AWS with Terraform and shell scripts.
 
 - **Live (AWS):** https://d37hjhs1g613o6.cloudfront.net
+- **API reference:** https://d37hjhs1g613o6.cloudfront.net/api-docs (Swagger UI for [docs/api/openapi.yaml](./docs/api/openapi.yaml)); Postman suite in [postman/](./postman/)
 - **Testing:** see [TESTING.md](./TESTING.md) for commands, results, coverage and known gaps
 - **Workshop guides:** [docs/](./docs/README.md)
 
@@ -15,11 +16,12 @@ Built for the Citi Coding Workshop (Full Stack track) on the required stack: **R
 1. [What it does](#what-it-does)
 2. [Business rules](#business-rules)
 3. [Architecture](#architecture)
-4. [Running it locally](#running-it-locally)
-5. [Deploying to AWS](#deploying-to-aws)
-6. [Repository layout](#repository-layout)
-7. [Design decisions and trade-offs](#design-decisions-and-trade-offs)
-8. [Known limitations](#known-limitations)
+4. [API reference and Postman tests](#api-reference-and-postman-tests)
+5. [Running it locally](#running-it-locally)
+6. [Deploying to AWS](#deploying-to-aws)
+7. [Repository layout](#repository-layout)
+8. [Design decisions and trade-offs](#design-decisions-and-trade-offs)
+9. [Known limitations](#known-limitations)
 
 ---
 
@@ -70,6 +72,21 @@ graph LR
 - **Consistent API:** JSON everywhere, errors as `{"error": {"code", "message", "details"}}`, status codes 200/201/204/400/401/403/404/405/409/429/500, `PATCH` and `PUT` for updates, filtering and pagination via query parameters.
 - **Frontend:** organised by feature (`auth/`, `pages/`, `components/<feature>/`, `services/`, `hooks/`); one API client with transparent token refresh; a central permissions map that hides what a role can't do; lazily loaded pages; 30 s polling for near-real-time data.
 
+## API reference and Postman tests
+
+- **OpenAPI 3 spec:** [docs/api/openapi.yaml](./docs/api/openapi.yaml) documents all 52 operations across the six services: request and response schemas, who may call each one, the business-rule errors each can return, and examples. It is the single source for everything below.
+- **Swagger UI in the app:** open **`/api-docs`** on any running copy ([live](https://d37hjhs1g613o6.cloudfront.net/api-docs), or http://localhost:3000/api-docs). *Try it out* calls the API of the site you're on: run `login`, copy the `access_token`, click **Authorize**.
+- **SwaggerHub:** *Create New → Import and Document API*, then paste `https://d37hjhs1g613o6.cloudfront.net/openapi.yaml` (or upload the file).
+- **Kept in sync:** `backend/tests/unit/test_openapi.py` fails if a route is added, removed or renamed without updating the spec, and the spec passes [Redocly](https://redocly.com/docs/cli/) lint (`npx @redocly/cli@1.25.11 lint --config docs/api/redocly.yaml docs/api/openapi.yaml`).
+- **Postman suite:** [postman/project-hub.postman_collection.json](./postman/project-hub.postman_collection.json): 90 requests and 300 assertions in 10 folders, run in order as one journey. It signs in as each role, creates its own clearly named data, checks every rule and refusal (400/401/403/404/405/409) and cleans up after itself. Import it into Postman with the [local](./postman/local.postman_environment.json) or [AWS](./postman/aws.postman_environment.json) environment (on AWS, fill in the three passwords), or run it from a terminal with Newman:
+
+```sh
+./bin/api-tests.sh            # local stack
+./bin/api-tests.sh aws        # live site (reads the demo passwords from CloudWatch, never prints them)
+```
+
+Each run writes an HTML report to `postman/reports/` (with passwords and tokens left out). The collection is generated from [postman/build_collection.py](./postman/build_collection.py), so the test scripts are readable; run `python3 postman/build_collection.py` after editing it.
+
 ## Running it locally
 
 **Prerequisites:** the workshop VDI (Docker, LocalStack Pro with `LOCALSTACK_AUTH_TOKEN`, PostgreSQL, Terraform, Node 22, Python 3.13), as checked by [docs/validation.md](./docs/validation.md).
@@ -92,11 +109,12 @@ After editing backend code, run `./bin/build-backend.sh` (about a second); Local
 
 ```sh
 cd backend && python3 -m venv .venv && .venv/bin/pip install -r requirements-dev.txt
-.venv/bin/pytest                      # 372 unit + integration tests (uses a separate pm_test database)
+.venv/bin/pytest                      # 376 unit + integration tests (uses a separate pm_test database)
 .venv/bin/ruff check . && .venv/bin/ruff format --check .
 cd ../frontend && npm test            # 168 component/service tests (Vitest + React Testing Library)
-npm run lint && npm run e2e           # ESLint; 18 Playwright journeys + 5 axe accessibility scans
+npm run lint && npm run e2e           # ESLint; 22 Playwright journeys + 5 axe accessibility scans
 cd .. && ./bin/smoke-test.sh          # 75 live API checks (local by default, or pass a URL)
+./bin/api-tests.sh                    # Postman collection via Newman: 90 requests, 300 assertions
 ```
 
 ## Deploying to AWS
@@ -106,6 +124,7 @@ cd .. && ./bin/smoke-test.sh          # 75 live API checks (local by default, or
 ./bin/deploy-frontend.sh aws          # builds with the CloudFront URL, uploads to S3, invalidates the cache
 ./bin/smoke-test.sh https://<cloudfront-domain>    # with SMOKE_*_PASSWORD set (see below)
 ./bin/e2e-live.sh [--ui | --headed]   # Playwright journeys against the live site (reads the demo passwords itself)
+./bin/api-tests.sh aws                # Postman collection against the live API (same password lookup)
 ```
 
 **Demo accounts on AWS use random passwords** (the repository is public, so the documented local passwords are never used in the cloud). They are logged once, privately, when the database is first seeded:
@@ -132,9 +151,12 @@ backend/
 frontend/
   src/               React app (auth/, pages/, components/<feature>/, services/, hooks/, utils/)
   e2e/               Playwright journeys
+  public/api-docs.html  Swagger UI page (the spec is copied in at dev/build time)
 infra/               Terraform (template) + cloudfront.tf SPA routing + scheduler.tf
-bin/                 dev/deploy scripts, build-backend.sh, smoke-test.sh, e2e-live.sh
+bin/                 dev/deploy scripts, build-backend.sh, smoke-test.sh, e2e-live.sh, api-tests.sh
+postman/             Postman collection (+ its generator) and local/AWS environments
 loadtest/            Artillery load test
+docs/api/            OpenAPI 3 spec and its lint config
 docs/                workshop guides (unchanged)
 ```
 
@@ -151,6 +173,7 @@ docs/                workshop guides (unchanged)
 | 6-character passwords (per brief) | Requirement | Mitigated by PBKDF2 (120k rounds), lockout after 5 failures in 15 min, identical errors for unknown IDs |
 | Polling instead of WebSockets | Lambda function URLs can't hold persistent connections | Up to 30 s latency for others' changes |
 | CloudFront Function for SPA routes | Deep links work; API 404s stay real 404s (the template's global 404→index.html rewrite broke both) | One small infra addition |
+| Hand-written OpenAPI spec, checked against the router by a test | Documents the business rules and role limits, which generated specs can't; the test stops it drifting from the code | Schemas are maintained by hand |
 | Vitest instead of Jest | Vite-native, Jest-compatible API (`describe/it/expect`, mocks); React Testing Library as the rubric asks | - |
 
 ## Known limitations

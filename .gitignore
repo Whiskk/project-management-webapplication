@@ -265,3 +265,5 @@ frontend/coverage/
 frontend/e2e-report/
 frontend/test-results/
 loadtest/results*.json
+frontend/public/openapi.yaml
+postman/reports/

@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <title>Project Hub API</title>
+    <!-- Swagger UI renders docs/api/openapi.yaml (copied to /openapi.yaml at build time). -->
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5.17.14/swagger-ui.css"
+      integrity="sha384-wxLW6kwyHktdDGr6Pv1zgm/VGJh99lfUbzSn6HNHBENZlCN7W602k9VkGdxuFvPn"
+      crossorigin="anonymous"
+    />
+    <style>
+      body { margin: 0; background: #fafafa; }
+      .topbar-hub {
+        display: flex; align-items: center; justify-content: space-between; gap: 16px;
+        padding: 12px 24px; background: #0b1120; color: #e2e8f0;
+        font: 500 15px/1.4 system-ui, -apple-system, 'Segoe UI', sans-serif;
+      }
+      .topbar-hub a { color: #6fd3a4; text-decoration: none; }
+      .topbar-hub a:hover, .topbar-hub a:focus-visible { text-decoration: underline; }
+    </style>
+  </head>
+  <body>
+    <header class="topbar-hub">
+      <span>Project Hub API</span>
+      <nav><a href="/openapi.yaml" download>openapi.yaml</a> &middot; <a href="/">Back to the app</a></nav>
+    </header>
+    <main id="swagger-ui"></main>
+    <script
+      src="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5.17.14/swagger-ui-bundle.js"
+      integrity="sha384-wmyclcVGX/WhUkdkATwhaK1X1JtiNrr2EoYJ+diV3vj4v6OC5yCeSu+yW13SYJep"
+      crossorigin="anonymous"
+    ></script>
+    <script>
+      // In local development the app (port 3000) and the API proxy (port 3001) are separate
+      // servers, so "Try it out" calls aimed at this page's own origin go to the proxy instead.
+      const isLocalApp = ['localhost', '127.0.0.1'].includes(location.hostname) && location.port !== '3001';
+      const toLocalApi = (request) => {
+        if (isLocalApp && request.url.startsWith(location.origin + '/api/')) {
+          request.url = 'http://localhost:3001' + request.url.slice(location.origin.length);
+        }
+        return request;
+      };
+
+      window.ui = SwaggerUIBundle({
+        requestInterceptor: toLocalApi,
+        url: '/openapi.yaml',
+        dom_id: '#swagger-ui',
+        deepLinking: true,
+        // Keep the token across reloads so "Try it out" stays signed in.
+        persistAuthorization: true,
+        docExpansion: 'list',
+        defaultModelsExpandDepth: 0,
+        tryItOutEnabled: false,
+      });
+    </script>
+  </body>
+</html>
