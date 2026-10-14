@@ -14,7 +14,10 @@ export default defineConfig({
   fullyParallel: false,
   timeout: 60_000,
   expect: { timeout: 15_000 },
-  retries: 0,
+  // One retry: locally, LocalStack starting Lambda containers adds Docker network
+  // interfaces, and Chromium aborts in-flight page loads (net::ERR_NETWORK_CHANGED),
+  // leaving a blank page. A retry absorbs that; real failures fail both attempts.
+  retries: 1,
   reporter: [['list'], ['html', { open: 'never', outputFolder: 'e2e-report' }]],
   use: {
     // 127.0.0.1 rather than localhost: the Vite dev server listens on IPv4 only,

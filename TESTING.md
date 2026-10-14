@@ -9,7 +9,7 @@ Results below are from **14 October 2026**, against commit `7a131b7` (local) and
 |---|---|---|---|---|
 | Backend unit + integration | pytest (+ pytest-cov) against a real PostgreSQL `pm_test` database | **335** | ✅ all pass | **99%** of backend code |
 | Frontend components + services | Vitest + React Testing Library | **133** | ✅ all pass | **90.2% lines**, 88.9% statements, 85.2% branches, 79.3% functions |
-| End-to-end (browser) | Playwright (Chromium desktop + Pixel 7 mobile) | **9 journeys** | ✅ all pass **locally and on AWS** | all critical user paths (below) |
+| End-to-end (browser) | Playwright (Chromium desktop + Pixel 7 mobile) | **18 journeys** | ✅ all pass locally (the original 9 also on AWS) | all critical user paths (below) |
 | Live API smoke test | `bin/smoke-test.sh` (curl) | **62 checks** | ✅ 62/62 **locally and on AWS** | every service and business rule |
 | Load | Artillery | 700 virtual users, 4,200 requests | ✅ 0 errors on AWS | see [Performance](#performance) |
 | Static analysis | ruff (Python), ESLint (JS), bandit (security), npm audit | - | ✅ all clean | - |
@@ -89,9 +89,20 @@ Run in real Chromium against the running app and backend; each run creates uniqu
 | **Core journey** | Admin creates a project → manager adds a milestone and staffs an employee (live cost preview) → employee sees the project and their hours → admin archives it |
 | Budget rule in the UI | The assign dialog blocks staffing beyond the budget |
 | **Cross-team approval** | Admin requests an employee's hours → their manager approves from the Approvals page → the decision appears in the project's audit history |
+| Cross-team rejection | The employee's manager rejects with a reason → the request disappears and the reserved hours are freed |
+| **Project request approved** | Manager submits a request → admin approves it → the project exists, managed by the requester, linked from the request |
+| Project request rejected | A reason is required → the manager sees the admin's reason on the request |
+| **Milestone dependencies** | A dependent milestone can't start before its dependency is due, or be in progress before it is completed; completing the dependency unblocks it; progress updates |
+| Archive and reactivate | Archived projects are read-only and hidden from the default list, found under *Archived*, and can be reactivated |
+| **Profile edit is audited** | An employee can edit only name/email → the admin sees the change in the audit log with before/after values |
+| Failed sign-ins are audited | A wrong password appears in the audit log filtered to *Denied* |
+| Budget monitor on demand | Admin runs the budget check from the dashboard |
+| Dashboard navigation | Dashboard tiles link to the matching pages |
 | Mobile layout (Pixel 7) | Slide-out navigation |
 
-**Result:** 9/9 locally (≈55 s) and 9/9 against AWS.
+**Result:** 18/18 locally.
+
+To watch the journeys run (e.g. for a demo), from `frontend/`: `npx playwright test --ui` (pick and replay tests step by step), or `npx playwright test --headed --project=desktop` (a real browser window).
 
 ## Performance
 
