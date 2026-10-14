@@ -24,7 +24,6 @@ function ProductPanel() {
       sx={{
         display: { xs: 'none', md: 'flex' },
         flexDirection: 'column',
-        justifyContent: 'space-between',
         p: 6,
         borderRight: 1,
         borderColor: 'divider',
@@ -36,7 +35,8 @@ function ProductPanel() {
         <Typography variant="h6" component="span">Project Hub</Typography>
       </Stack>
 
-      <Box sx={{ maxWidth: 480 }}>
+      {/* The headline sits in the vertical middle of the panel, under the logo. */}
+      <Box sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', maxWidth: 480, mx: 'auto', width: '100%' }}>
         <Typography component="p" sx={{ fontSize: { md: '2.25rem', lg: '2.75rem' }, fontWeight: 700, lineHeight: 1.15, letterSpacing: '-0.025em' }}>
           Project management made easy.
         </Typography>

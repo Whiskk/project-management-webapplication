@@ -24,7 +24,8 @@ export async function signIn(page, role) {
   await page.getByLabel('Employee ID').fill(user.id);
   await page.getByLabel('Password').fill(user.password);
   await page.getByRole('button', { name: 'Sign in' }).click();
-  await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible();
+  // Generous wait: on AWS the first request after idle wakes Aurora Serverless (~15-20 s).
+  await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible({ timeout: 45_000 });
 }
 
 /** Sign out via the account menu. */
