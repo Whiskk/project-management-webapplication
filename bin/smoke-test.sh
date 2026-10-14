@@ -154,6 +154,10 @@ check "admin sees this run's project in the log" True "$(curl -s -m 30 -H "$A" "
 check "denied attempts are recorded" True "$(curl -s -m 30 -H "$A" "$API/audit?outcome=denied&actor=MGR001&page_size=5" | json 'd["total"] > 0')"
 check "audit log has no write routes" 405 "$(status -X DELETE -H "$A" "$API/audit")"
 
+echo "[budget monitor]"
+check "manager cannot trigger the budget check" 403 "$(status -X POST -H "$M" "$API/monitor/run")"
+check "admin runs the budget check" True "$(curl -s -m 60 -X POST -H "$A" "$API/monitor/run" | json 'd["checked"] >= 1')"
+
 echo "[cleanup]"
 for pair in "$P1:$A1" "$P2:$A2"; do
     check "remove assignment ${pair#*:}" 204 "$(status -X DELETE -H "$A" "$API/projects/${pair%%:*}/assignments/${pair#*:}")"

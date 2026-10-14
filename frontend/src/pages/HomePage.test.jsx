@@ -36,6 +36,23 @@ describe('HomePage dashboards', () => {
     expect(await screen.findByText('Schema v3')).toBeInTheDocument();
   });
 
+  it('lets admins run the budget check on demand', async () => {
+    renderAs('admin', {
+      role: 'admin',
+      stats: {
+        active_projects: 1, over_budget: 0, needing_attention: 0, pending_requests: 0,
+        people: { admin: 1, manager: 1, employee: 1 }, total_budget: 1000, total_projected_cost: 900,
+      },
+      attention: [],
+    });
+    const post = vi.spyOn(api, 'post').mockResolvedValue({
+      checked: 3, newly_over_budget: ['Apollo'], back_within_budget: [], still_over_budget: 0,
+    });
+    await userEvent.click(await screen.findByRole('button', { name: 'Run budget check now' }));
+    expect(post).toHaveBeenCalledWith('monitor', '/run');
+    expect(await screen.findByText('Budget check found changes - now over budget: Apollo')).toBeInTheDocument();
+  });
+
   it('shows managers their team load and waiting decisions', async () => {
     renderAs('manager', {
       role: 'manager',

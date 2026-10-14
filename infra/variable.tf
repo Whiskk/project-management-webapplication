@@ -83,3 +83,9 @@ variable "aws_eks_type" {
     error_message = "The aws_eks_type variable must be either 'ON_DEMAND' or 'SPOT'."
   }
 }
+
+variable "aws_monitor_schedule_enabled" {
+  type        = bool
+  description = "Create the hourly EventBridge schedule for the budget monitor on AWS (always on for LocalStack). Requires events:* permissions."
+  default     = false
+}

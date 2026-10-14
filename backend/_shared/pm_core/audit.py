@@ -30,12 +30,16 @@ _IGNORED_FIELDS = {"updated_at", "created_at"}
 
 @dataclass(frozen=True)
 class Actor:
-    """The authenticated user performing an action."""
+    """The authenticated user performing an action (or the system, with no id or role)."""
 
-    id: int
+    id: int | None
     employee_id: str
     name: str
-    role: str
+    role: str | None
+
+
+# Recorded as the actor for automated actions such as the scheduled budget monitor.
+SYSTEM = Actor(id=None, employee_id="SYSTEM", name="Budget monitor", role=None)
 
 
 def _normalise(value: Any) -> Any:

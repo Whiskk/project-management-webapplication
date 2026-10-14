@@ -15,13 +15,14 @@ import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import { useAuth } from '../auth/authContext';
 import { ROLE_LABELS } from '../auth/permissions';
+import BudgetCheckButton from '../components/dashboard/BudgetCheckButton';
 import { AttentionList, CapacityBar, StatTile } from '../components/dashboard/DashboardWidgets';
 import SystemStatus from '../components/dashboard/SystemStatus';
 import useApiResource from '../hooks/useApiResource';
 import { projectsApi } from '../services/projectsApi';
 import { formatCurrency, formatDate, formatHours, fullName } from '../utils/format';
 
-function AdminDashboard({ data }) {
+function AdminDashboard({ data, onRefresh }) {
   const { stats } = data;
   const committed = Number(stats.total_projected_cost);
   const budget = Number(stats.total_budget);
@@ -43,9 +44,10 @@ function AdminDashboard({ data }) {
             <Typography variant="h3" component="h2" gutterBottom>Budget committed</Typography>
             <Typography variant="h2" component="p">{formatCurrency(committed)} <Typography component="span" color="text.secondary">of {formatCurrency(budget)}</Typography></Typography>
             <CapacityBar used={committed} capacity={budget || 1} label="Budget committed across active projects" />
-            <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 1, mb: 2 }}>
               Projected labour cost across active projects.
             </Typography>
+            <BudgetCheckButton onDone={onRefresh} />
           </CardContent>
         </Card>
       </Grid>
@@ -208,7 +210,7 @@ export default function HomePage() {
           {dashboard.error.message}
         </Alert>
       )}
-      {dashboard.status === 'success' && Dashboard && <Dashboard data={dashboard.data} />}
+      {dashboard.status === 'success' && Dashboard && <Dashboard data={dashboard.data} onRefresh={dashboard.reload} />}
     </Stack>
   );
 }

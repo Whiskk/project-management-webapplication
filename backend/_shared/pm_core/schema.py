@@ -188,6 +188,15 @@ MIGRATIONS: list[tuple[int, str]] = [
         CREATE INDEX project_requests_status_idx ON project_requests (status, created_at);
         """,
     ),
+    (
+        4,
+        # Set by the scheduled budget monitor when a project is first seen over
+        # budget, cleared when it is back within budget, so each change is
+        # reported once rather than on every run.
+        """
+        ALTER TABLE projects ADD COLUMN over_budget_since TIMESTAMPTZ;
+        """,
+    ),
 ]
 
 # Demo accounts created on an empty database.
