@@ -2,9 +2,9 @@ import { expect } from '@playwright/test';
 
 /** Demo accounts; passwords default to the local-only demo values. */
 export const USERS = {
-  admin: { id: 'ADM001', password: process.env.E2E_ADMIN_PASSWORD || 'Admin1', name: 'Alex Admin' },
-  manager: { id: 'MGR001', password: process.env.E2E_MANAGER_PASSWORD || 'Mngr01', name: 'Morgan Manager' },
-  employee: { id: 'EMP001', password: process.env.E2E_EMPLOYEE_PASSWORD || 'Empl01', name: 'Eli Employee' },
+  admin: { id: 'AA7K2P', password: process.env.E2E_ADMIN_PASSWORD || 'Admin1', name: 'Alex Admin' },
+  manager: { id: 'MM4R8T', password: process.env.E2E_MANAGER_PASSWORD || 'Mngr01', name: 'Morgan Manager' },
+  employee: { id: 'EE3H9W', password: process.env.E2E_EMPLOYEE_PASSWORD || 'Empl01', name: 'Eli Employee' },
 };
 
 /** A name unique to this run, so journeys never collide with real data. */

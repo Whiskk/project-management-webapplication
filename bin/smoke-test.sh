@@ -18,9 +18,9 @@ if [ "${1:-}" = "-h" ] || [ "${1:-}" = "--help" ]; then
     echo "                  For AWS use the CloudFront URL, e.g. https://dxxxx.cloudfront.net"
     echo ""
     echo "Environment (demo account passwords; defaults are the local-only demo values):"
-    echo "  SMOKE_ADMIN_PASSWORD     password for ADM001"
-    echo "  SMOKE_MANAGER_PASSWORD   password for MGR001"
-    echo "  SMOKE_EMPLOYEE_PASSWORD  password for EMP001"
+    echo "  SMOKE_ADMIN_PASSWORD     password for AA7K2P"
+    echo "  SMOKE_MANAGER_PASSWORD   password for MM4R8T"
+    echo "  SMOKE_EMPLOYEE_PASSWORD  password for EE3H9W"
     exit 0
 fi
 
@@ -50,9 +50,9 @@ echo "[health]"
 check "API and database up" ok "$(curl -s -m 30 "$API/health" | json 'd["database"]')"
 
 echo "[auth]"
-ADMIN_TOKEN=$(login ADM001 "${SMOKE_ADMIN_PASSWORD:-Admin1}")
-MANAGER_TOKEN=$(login MGR001 "${SMOKE_MANAGER_PASSWORD:-Mngr01}")
-EMPLOYEE_TOKEN=$(login EMP001 "${SMOKE_EMPLOYEE_PASSWORD:-Empl01}")
+ADMIN_TOKEN=$(login AA7K2P "${SMOKE_ADMIN_PASSWORD:-Admin1}")
+MANAGER_TOKEN=$(login MM4R8T "${SMOKE_MANAGER_PASSWORD:-Mngr01}")
+EMPLOYEE_TOKEN=$(login EE3H9W "${SMOKE_EMPLOYEE_PASSWORD:-Empl01}")
 check "admin login" yes "$([ -n "$ADMIN_TOKEN" ] && echo yes || echo no)"
 check "manager login" yes "$([ -n "$MANAGER_TOKEN" ] && echo yes || echo no)"
 check "employee login" yes "$([ -n "$EMPLOYEE_TOKEN" ] && echo yes || echo no)"
@@ -64,14 +64,14 @@ A="Authorization: Bearer $ADMIN_TOKEN"
 M="Authorization: Bearer $MANAGER_TOKEN"
 E="Authorization: Bearer $EMPLOYEE_TOKEN"
 check "no token is rejected" 401 "$(status "$API/users")"
-check "bad password is rejected" 401 "$(status -X POST -H "$J" -d '{"employee_id":"EMP001","password":"wrong!"}' "$API/auth/login")"
+check "bad password is rejected" 401 "$(status -X POST -H "$J" -d '{"employee_id":"EE3H9W","password":"wrong!"}' "$API/auth/login")"
 
 echo "[users]"
-MGR_ID=$(curl -s -m 30 -H "$A" "$API/users?q=MGR001" | json 'd["items"][0]["id"]')
-EMP_ID=$(curl -s -m 30 -H "$A" "$API/users?q=EMP001" | json 'd["items"][0]["id"]')
-ADM_ID=$(curl -s -m 30 -H "$A" "$API/users?q=ADM001" | json 'd["items"][0]["id"]')
+MGR_ID=$(curl -s -m 30 -H "$A" "$API/users?q=MM4R8T" | json 'd["items"][0]["id"]')
+EMP_ID=$(curl -s -m 30 -H "$A" "$API/users?q=EE3H9W" | json 'd["items"][0]["id"]')
+ADM_ID=$(curl -s -m 30 -H "$A" "$API/users?q=AA7K2P" | json 'd["items"][0]["id"]')
 check "employee cannot list users" 403 "$(status -H "$E" "$API/users")"
-check "manager cannot see admin salary" None "$(curl -s -m 30 -H "$M" "$API/users?q=ADM001" | json 'd["items"][0]["salary"]')"
+check "manager cannot see admin salary" None "$(curl -s -m 30 -H "$M" "$API/users?q=AA7K2P" | json 'd["items"][0]["salary"]')"
 check "manager cannot edit a non-report" 403 "$(status -X PATCH -H "$M" -H "$J" -d '{"first_name":"X"}' "$API/users/$ADM_ID")"
 check "employee cannot change own role" 400 "$(status -X PATCH -H "$E" -H "$J" -d '{"role":"admin"}' "$API/users/me")"
 ORIGINAL=$(curl -s -m 30 -H "$E" "$API/users/$EMP_ID" | json 'd["first_name"]')
@@ -151,7 +151,7 @@ check "archive requested project (cleanup)" 200 "$(status -X POST -H "$A" "$API/
 echo "[audit log]"
 check "manager cannot read the audit log" 403 "$(status -H "$M" "$API/audit")"
 check "admin sees this run's project in the log" True "$(curl -s -m 30 -H "$A" "$API/audit?project_id=$P1&page_size=200" | json 'any(i["action"] == "project.create" for i in d["items"])')"
-check "denied attempts are recorded" True "$(curl -s -m 30 -H "$A" "$API/audit?outcome=denied&actor=MGR001&page_size=5" | json 'd["total"] > 0')"
+check "denied attempts are recorded" True "$(curl -s -m 30 -H "$A" "$API/audit?outcome=denied&actor=MM4R8T&page_size=5" | json 'd["total"] > 0')"
 check "audit log has no write routes" 405 "$(status -X DELETE -H "$A" "$API/audit")"
 
 echo "[budget monitor]"

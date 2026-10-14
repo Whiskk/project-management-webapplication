@@ -10,7 +10,7 @@ pytestmark = pytest.mark.db
 service = load_service("projects")
 
 
-def call(method: str, path: str, as_: str = "MGR001", body: object = None) -> tuple[int, dict]:
+def call(method: str, path: str, as_: str = "MM4R8T", body: object = None) -> tuple[int, dict]:
     response = service.handler(make_event(method, f"/api/projects{path}", body=body, headers=bearer(as_)))
     return response["statusCode"], response_json(response)
 
@@ -23,15 +23,15 @@ def user_id(employee_id: str) -> int:
 
 @pytest.fixture
 def project(fresh_db: None) -> int:
-    """A project running through November 2026, managed by MGR001."""
+    """A project running through November 2026, managed by MM4R8T."""
     status, body = call(
         "POST",
         "/",
-        "ADM001",
+        "AA7K2P",
         {
             "name": "Apollo",
             "budget": 100000,
-            "manager_id": user_id("MGR001"),
+            "manager_id": user_id("MM4R8T"),
             "start_date": "2026-11-02",
             "predicted_end_date": "2026-11-30",
         },
@@ -88,15 +88,15 @@ def test_team_members_can_view_but_not_edit(project: int) -> None:
     with db.transaction() as cur:
         cur.execute(
             "INSERT INTO project_assignments (project_id, user_id, hours_per_week) VALUES (%s, %s, 5)",
-            (project, user_id("EMP001")),
+            (project, user_id("EE3H9W")),
         )
     add(project, "Design", "2026-11-02", "2026-11-06")
-    assert call("GET", f"/{project}/milestones", "EMP001")[0] == 200
+    assert call("GET", f"/{project}/milestones", "EE3H9W")[0] == 200
     assert (
         call(
             "POST",
             f"/{project}/milestones",
-            "EMP001",
+            "EE3H9W",
             {"title": "x", "start_date": "2026-11-02", "due_date": "2026-11-03"},
         )[0]
         == 403
@@ -168,11 +168,11 @@ def test_dependencies_must_be_in_the_same_project(project: int) -> None:
     _, other = call(
         "POST",
         "/",
-        "ADM001",
+        "AA7K2P",
         {
             "name": "Other",
             "budget": 1,
-            "manager_id": user_id("MGR001"),
+            "manager_id": user_id("MM4R8T"),
             "start_date": "2026-11-02",
             "predicted_end_date": "2026-11-30",
         },
@@ -289,9 +289,9 @@ def test_cannot_delete_a_milestone_others_depend_on(project: int) -> None:
 
 def test_archived_project_milestones_are_read_only(project: int) -> None:
     design = add(project, "Design", "2026-11-02", "2026-11-06")
-    call("POST", f"/{project}/archive", "ADM001")
+    call("POST", f"/{project}/archive", "AA7K2P")
     assert update(project, design["id"], title="x")[0] == 409
-    assert call("GET", f"/{project}/milestones", "ADM001")[0] == 200
+    assert call("GET", f"/{project}/milestones", "AA7K2P")[0] == 200
 
 
 def test_unchanged_update_is_not_audited(project: int) -> None:

@@ -9,7 +9,7 @@ import pytest
 from pm_core import audit, db
 from pm_core.audit import Actor
 
-ACTOR = Actor(id=1, employee_id="ADM001", name="Alex Admin", role="admin")
+ACTOR = Actor(id=1, employee_id="AA7K2P", name="Alex Admin", role="admin")
 
 
 def test_diff_reports_only_changed_fields() -> None:
@@ -50,7 +50,7 @@ def test_record_writes_entry_in_same_transaction(fresh_db: None) -> None:
     with db.transaction() as cur:
         cur.execute("SELECT * FROM audit_log")
         row = cur.fetchone()
-    assert row["actor_employee_id"] == "ADM001"
+    assert row["actor_employee_id"] == "AA7K2P"
     assert row["actor_name"] == "Alex Admin"
     assert row["action"] == "project.update"
     assert row["changes"] == {"name": {"from": "A", "to": "B"}}

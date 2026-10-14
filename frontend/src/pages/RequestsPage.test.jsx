@@ -19,7 +19,7 @@ function makeRequest(overrides = {}) {
     status: 'pending',
     requested_by: TEST_USERS.manager.id,
     requested_by_name: 'Morgan Manager',
-    requested_by_employee_id: 'MGR001',
+    requested_by_employee_id: 'MM4R8T',
     created_at: '2026-10-14T09:00:00Z',
     reviewed_by_name: null,
     reviewed_at: null,

@@ -44,11 +44,11 @@ def test_demo_users_are_seeded_with_hashed_passwords(fresh_db: None) -> None:
         )
         rows = cur.fetchall()
     assert [(r["employee_id"], r["role"]) for r in rows] == [
-        ("ADM001", "admin"),
-        ("MGR001", "manager"),
-        ("EMP001", "employee"),
+        ("AA7K2P", "admin"),
+        ("MM4R8T", "manager"),
+        ("EE3H9W", "employee"),
     ]
-    assert rows[2]["manager"] == "MGR001"
+    assert rows[2]["manager"] == "MM4R8T"
     for row, demo in zip(rows, schema.DEMO_USERS, strict=True):
         assert demo["local_password"] not in row["password_hash"]
         assert passwords.verify_password(demo["local_password"], row["password_hash"])

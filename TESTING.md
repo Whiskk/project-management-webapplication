@@ -7,7 +7,7 @@ Results below are from **14 October 2026**, against commit `7a131b7` (local) and
 
 | Layer | Tool | Tests | Result | Coverage |
 |---|---|---|---|---|
-| Backend unit + integration | pytest (+ pytest-cov) against a real PostgreSQL `pm_test` database | **312** | ✅ all pass | **99%** of backend code |
+| Backend unit + integration | pytest (+ pytest-cov) against a real PostgreSQL `pm_test` database | **323** | ✅ all pass | **99%** of backend code |
 | Frontend components + services | Vitest + React Testing Library | **125** | ✅ all pass | **90.2% lines**, 88.9% statements, 85.2% branches, 79.3% functions |
 | End-to-end (browser) | Playwright (Chromium desktop + Pixel 7 mobile) | **8 journeys** | ✅ all pass **locally and on AWS** | all critical user paths (below) |
 | Live API smoke test | `bin/smoke-test.sh` (curl) | **62 checks** | ✅ 62/62 **locally and on AWS** | every service and business rule |
@@ -43,7 +43,7 @@ E2E_BASE_URL=https://<cloudfront> E2E_ADMIN_PASSWORD=... E2E_MANAGER_PASSWORD=..
 SMOKE_ADMIN_PASSWORD=... SMOKE_MANAGER_PASSWORD=... SMOKE_EMPLOYEE_PASSWORD=... ./bin/smoke-test.sh https://<cloudfront>
 
 # Load test
-npx artillery@2 run loadtest/api-load.yml --target https://<cloudfront> --variables '{"password":"<MGR001 password>"}'
+npx artillery@2 run loadtest/api-load.yml --target https://<cloudfront> --variables '{"password":"<MM4R8T password>"}'
 ```
 
 On AWS the demo passwords are random; see the README's *Deploying to AWS* section for where to find them.

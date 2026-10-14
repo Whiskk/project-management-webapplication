@@ -48,7 +48,7 @@ describe('UsersPage', () => {
 
   it('lets admins create a user and shows the one-time password', async () => {
     vi.spyOn(usersApi, 'create').mockResolvedValue({
-      user: { ...TEST_USERS.employee, id: 9, employee_id: 'EMP002', first_name: 'Nia', last_name: 'Newhire' },
+      user: { ...TEST_USERS.employee, id: 9, employee_id: 'NN4F7R', first_name: 'Nia', last_name: 'Newhire' },
       temporary_password: 'Ab3dE9',
     });
     renderAs('admin');
@@ -61,7 +61,7 @@ describe('UsersPage', () => {
     await userEvent.type(within(dialog).getByLabelText(/Email/), 'nia@example.com');
     await userEvent.type(within(dialog).getByLabelText(/Annual salary/), '80000');
     await userEvent.click(within(dialog).getByRole('combobox', { name: /^Manager/ }));
-    await userEvent.click(await screen.findByRole('option', { name: 'Morgan Manager (MGR001)' }));
+    await userEvent.click(await screen.findByRole('option', { name: 'Morgan Manager (MM4R8T)' }));
     await userEvent.click(within(dialog).getByRole('button', { name: 'Create user' }));
 
     expect(usersApi.create).toHaveBeenCalledWith({

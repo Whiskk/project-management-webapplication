@@ -10,11 +10,11 @@ pytestmark = pytest.mark.db
 
 service = load_service("audit")
 
-ADMIN = Actor(id=1, employee_id="ADM001", name="Alex Admin", role="admin")
-MANAGER = Actor(id=2, employee_id="MGR001", name="Morgan Manager", role="manager")
+ADMIN = Actor(id=1, employee_id="AA7K2P", name="Alex Admin", role="admin")
+MANAGER = Actor(id=2, employee_id="MM4R8T", name="Morgan Manager", role="manager")
 
 
-def call(path: str, as_: str = "ADM001", query: dict | None = None, method: str = "GET") -> tuple[int, dict]:
+def call(path: str, as_: str = "AA7K2P", query: dict | None = None, method: str = "GET") -> tuple[int, dict]:
     response = service.handler(make_event(method, f"/api/audit{path}", headers=bearer(as_), query=query))
     return response["statusCode"], response_json(response)
 
@@ -38,7 +38,7 @@ def entries(fresh_db: None) -> None:
             "user.update",
             "user",
             3,
-            "Updated Eli Employee (EMP001): job_title",
+            "Updated Eli Employee (EE3H9W): job_title",
             before={"job_title": "Engineer"},
             after={"job_title": "Lead"},
         )
@@ -67,7 +67,7 @@ def test_admin_lists_newest_first_with_project_names(entries: None) -> None:
     assert (created["project_name"], created["changes"]) == ("Apollo", {"name": {"from": None, "to": "Apollo"}})
 
 
-@pytest.mark.parametrize("as_", ["MGR001", "EMP001"])
+@pytest.mark.parametrize("as_", ["MM4R8T", "EE3H9W"])
 def test_only_admins_can_read_the_audit_log(entries: None, as_: str) -> None:
     assert call("/", as_)[0] == 403
     assert call("/actions", as_)[0] == 403
@@ -76,9 +76,9 @@ def test_only_admins_can_read_the_audit_log(entries: None, as_: str) -> None:
 @pytest.mark.parametrize(
     ("query", "expected"),
     [
-        ({"actor": "mgr001"}, ["Added milestone 'Design' to Apollo"]),
-        ({"role": "admin"}, ["Updated Eli Employee (EMP001): job_title", "Created project Apollo"]),
-        ({"action": "user.update"}, ["Updated Eli Employee (EMP001): job_title"]),
+        ({"actor": "mm4r8t"}, ["Added milestone 'Design' to Apollo"]),
+        ({"role": "admin"}, ["Updated Eli Employee (EE3H9W): job_title", "Created project Apollo"]),
+        ({"action": "user.update"}, ["Updated Eli Employee (EE3H9W): job_title"]),
         ({"outcome": "denied"}, ["Failed sign-in for NOPE01"]),
         ({"project_id": "1"}, ["Added milestone 'Design' to Apollo", "Created project Apollo"]),
         ({"entity_type": "milestone"}, ["Added milestone 'Design' to Apollo"]),

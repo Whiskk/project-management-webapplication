@@ -3,7 +3,8 @@ Users service: account management and self-service profile updates.
 
 Routes (under /api/users):
     GET   /                       admin, manager  list users (filters: q, role, manager_id, status; paginated)
-    POST  /                       admin           create a user (returns a one-time password)
+    POST  /                       admin           create a user (ID = initials + 4 random characters;
+                                                  returns a one-time password)
     PATCH /me                     any role        update own first/last name and email
     GET   /{id}                   any role        view a user (employees: only themselves)
     PATCH /{id}                   admin, manager  update a user (managers: direct reports' basic info)
@@ -19,7 +20,7 @@ from typing import Any
 import psycopg
 from psycopg import sql
 
-from pm_core import audit, budget, passwords
+from pm_core import audit, budget, identity, passwords
 from pm_core.audit import Actor
 from pm_core.auth import ROLES, deny, require_auth
 from pm_core.db import transaction
@@ -29,8 +30,6 @@ from pm_core.validation import Field, parse_choice, parse_id, parse_pagination, 
 
 router = Router("users")
 
-ID_PREFIXES = {"admin": "ADM", "manager": "MGR", "employee": "EMP"}
-_EMPLOYEE_ID_LOCK_KEY = 727_002
 
 PROFILE_FIELDS = {
     "first_name": Field("str", max_length=100),
@@ -96,20 +95,6 @@ def _fetch_user(cur: psycopg.Cursor, user_id: int, lock: bool = False) -> dict:
     if row is None:
         raise NotFound("User not found")
     return row
-
-
-def _next_employee_id(cur: psycopg.Cursor, role: str) -> str:
-    """Generate the next sequential employee id for a role, e.g. EMP002."""
-    prefix = ID_PREFIXES[role]
-    cur.execute("SELECT pg_advisory_xact_lock(%s)", (_EMPLOYEE_ID_LOCK_KEY,))
-    cur.execute(
-        """
-        SELECT COALESCE(MAX(substring(employee_id FROM 4)::int), 0) AS last
-        FROM users WHERE employee_id ~ %s
-        """,
-        (f"^{prefix}[0-9]+$",),
-    )
-    return f"{prefix}{cur.fetchone()['last'] + 1:03d}"
 
 
 def _email_taken(cur: psycopg.Cursor, email: str, exclude_id: int | None = None) -> bool:
@@ -241,7 +226,7 @@ def create_user(request: Request) -> Response:
         _check_manager(cur, data["manager_id"], data["role"])
         if _email_taken(cur, data["email"]):
             raise ValidationError({"email": "This email is already in use"})
-        employee_id = _next_employee_id(cur, data["role"])
+        employee_id = identity.generate_employee_id(cur, data["first_name"], data["last_name"])
         cur.execute(
             """
             INSERT INTO users (employee_id, first_name, last_name, email, job_title, salary,

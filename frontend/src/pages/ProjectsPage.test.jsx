@@ -86,7 +86,7 @@ describe('ProjectsPage', () => {
     await userEvent.type(within(dialog).getByLabelText(/Predicted end date/), '2026-12-18');
     await userEvent.type(within(dialog).getByLabelText(/Budget/), '75000');
     await userEvent.click(within(dialog).getByRole('combobox', { name: /^Project manager/ }));
-    await userEvent.click(await screen.findByRole('option', { name: 'Morgan Manager (MGR001)' }));
+    await userEvent.click(await screen.findByRole('option', { name: 'Morgan Manager (MM4R8T)' }));
     await userEvent.click(within(dialog).getByRole('button', { name: 'Create project' }));
 
     expect(create).toHaveBeenCalledWith(expect.objectContaining({

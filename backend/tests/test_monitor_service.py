@@ -15,18 +15,18 @@ SCHEDULED_EVENT = {"source": "aws.events", "detail-type": "Scheduled Event", "de
 
 @pytest.fixture
 def project(fresh_db: None) -> int:
-    """A project whose budget exactly covers EMP001 ($50/h) for 10 h/week over 2 weeks."""
+    """A project whose budget exactly covers EE3H9W ($50/h) for 10 h/week over 2 weeks."""
     with db.transaction() as cur:
-        cur.execute("UPDATE users SET salary = 104000 WHERE employee_id = 'EMP001'")
+        cur.execute("UPDATE users SET salary = 104000 WHERE employee_id = 'EE3H9W'")
         cur.execute(
             "INSERT INTO projects (name, start_date, predicted_end_date, manager_id, budget) "
-            "SELECT 'Apollo', '2026-11-02', '2026-11-13', id, 1000 FROM users WHERE employee_id = 'MGR001' "
+            "SELECT 'Apollo', '2026-11-02', '2026-11-13', id, 1000 FROM users WHERE employee_id = 'MM4R8T' "
             "RETURNING id"
         )
         project_id = cur.fetchone()["id"]
         cur.execute(
             "INSERT INTO project_assignments (project_id, user_id, hours_per_week) "
-            "SELECT %s, id, 10 FROM users WHERE employee_id = 'EMP001'",
+            "SELECT %s, id, 10 FROM users WHERE employee_id = 'EE3H9W'",
             (project_id,),
         )
     return project_id
@@ -34,7 +34,7 @@ def project(fresh_db: None) -> int:
 
 def set_salary(value: int) -> None:
     with db.transaction() as cur:
-        cur.execute("UPDATE users SET salary = %s WHERE employee_id = 'EMP001'", (value,))
+        cur.execute("UPDATE users SET salary = %s WHERE employee_id = 'EE3H9W'", (value,))
 
 
 def monitor_entries() -> list[dict]:
@@ -85,12 +85,12 @@ def test_archived_projects_are_ignored(project: int) -> None:
 
 def test_admin_can_run_it_on_demand(project: int) -> None:
     set_salary(208000)
-    response = service.handler(make_event("POST", "/api/monitor/run", headers=bearer("ADM001")))
+    response = service.handler(make_event("POST", "/api/monitor/run", headers=bearer("AA7K2P")))
     assert response["statusCode"] == 200
     assert response_json(response)["newly_over_budget"] == ["Apollo"]
 
 
-@pytest.mark.parametrize("as_", ["MGR001", "EMP001"])
+@pytest.mark.parametrize("as_", ["MM4R8T", "EE3H9W"])
 def test_only_admins_can_trigger_it(project: int, as_: str) -> None:
     response = service.handler(make_event("POST", "/api/monitor/run", headers=bearer(as_)))
     assert response["statusCode"] == 403

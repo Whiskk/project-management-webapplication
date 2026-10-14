@@ -15,7 +15,7 @@ function makeRequest(overrides = {}) {
     start_date: '2026-11-02',
     predicted_end_date: '2026-11-13',
     user_id: 3,
-    employee_id: 'EMP001',
+    employee_id: 'EE3H9W',
     first_name: 'Eli',
     last_name: 'Employee',
     job_title: 'Software Engineer',

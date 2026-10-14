@@ -42,19 +42,19 @@ def denied_entries() -> list[dict]:
 
 
 def test_any_authenticated_role_can_read(fresh_db: None) -> None:
-    for employee_id in ("ADM001", "MGR001", "EMP001"):
+    for employee_id in ("AA7K2P", "MM4R8T", "EE3H9W"):
         status, body = call("GET", "/", employee_id)
         assert status == 200
         assert body["actor"] == employee_id
 
 
-@pytest.mark.parametrize(("employee_id", "expected"), [("ADM001", 201), ("MGR001", 201), ("EMP001", 403)])
+@pytest.mark.parametrize(("employee_id", "expected"), [("AA7K2P", 201), ("MM4R8T", 201), ("EE3H9W", 403)])
 def test_role_restricted_write(fresh_db: None, employee_id: str, expected: int) -> None:
     assert call("POST", "/", employee_id)[0] == expected
 
 
 def test_denied_write_returns_consistent_error_and_is_audited(fresh_db: None) -> None:
-    status, body = call("POST", "/", "EMP001")
+    status, body = call("POST", "/", "EE3H9W")
     assert status == 403
     assert body == {
         "error": {
@@ -63,28 +63,28 @@ def test_denied_write_returns_consistent_error_and_is_audited(fresh_db: None) ->
         }
     }
     [entry] = denied_entries()
-    assert entry["actor_employee_id"] == "EMP001"
+    assert entry["actor_employee_id"] == "EE3H9W"
     assert entry["action"] == "access.denied"
     assert entry["summary"] == "Denied POST /things (requires role: admin, manager)"
 
 
 def test_denied_read_is_not_audited(fresh_db: None) -> None:
-    assert call("GET", "/admin-only", "MGR001")[0] == 403
+    assert call("GET", "/admin-only", "MM4R8T")[0] == 403
     assert denied_entries() == []
 
 
 def test_role_change_takes_effect_without_new_token(fresh_db: None) -> None:
-    headers = bearer("MGR001")
+    headers = bearer("MM4R8T")
     with db.transaction() as cur:
-        cur.execute("UPDATE users SET role = 'employee' WHERE employee_id = 'MGR001'")
+        cur.execute("UPDATE users SET role = 'employee' WHERE employee_id = 'MM4R8T'")
     response = router.handle(make_event("POST", "/", headers=headers))
     assert response["statusCode"] == 403
 
 
 def test_deactivated_user_is_rejected_immediately(fresh_db: None) -> None:
-    headers = bearer("EMP001")
+    headers = bearer("EE3H9W")
     with db.transaction() as cur:
-        cur.execute("UPDATE users SET is_active = FALSE WHERE employee_id = 'EMP001'")
+        cur.execute("UPDATE users SET is_active = FALSE WHERE employee_id = 'EE3H9W'")
     assert router.handle(make_event("GET", "/", headers=headers))["statusCode"] == 401
 
 

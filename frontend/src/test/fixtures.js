@@ -12,7 +12,7 @@ export function makeProject(overrides = {}) {
     capacity_hours: 80,
     manager_id: TEST_USERS.manager.id,
     manager_name: 'Morgan Manager',
-    manager_employee_id: 'MGR001',
+    manager_employee_id: 'MM4R8T',
     budget: 50000,
     status: 'active',
     is_archived: false,
@@ -36,7 +36,7 @@ export function makeAssignment(overrides = {}) {
   return {
     id: 31,
     user_id: TEST_USERS.employee.id,
-    employee_id: 'EMP001',
+    employee_id: 'EE3H9W',
     first_name: 'Eli',
     last_name: 'Employee',
     job_title: 'Software Engineer',
@@ -58,7 +58,7 @@ export function makeAssignment(overrides = {}) {
 export function makeStaffingOption(overrides = {}) {
   return {
     user_id: TEST_USERS.employee.id,
-    employee_id: 'EMP001',
+    employee_id: 'EE3H9W',
     first_name: 'Eli',
     last_name: 'Employee',
     job_title: 'Software Engineer',

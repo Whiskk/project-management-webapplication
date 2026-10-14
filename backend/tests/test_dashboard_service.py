@@ -27,20 +27,20 @@ def user_id(employee_id: str) -> int:
 
 @pytest.fixture
 def running(fresh_db: None) -> int:
-    """An active project running today, EMP001 ($50/h) staffed 10 h/week; budget barely covers it."""
+    """An active project running today, EE3H9W ($50/h) staffed 10 h/week; budget barely covers it."""
     today = date.today()
     start, end = today - timedelta(days=today.weekday()), today - timedelta(days=today.weekday()) + timedelta(days=11)
     with db.transaction() as cur:
-        cur.execute("UPDATE users SET salary = 104000 WHERE employee_id = 'EMP001'")
+        cur.execute("UPDATE users SET salary = 104000 WHERE employee_id = 'EE3H9W'")
     _, project = call(
         projects,
         "POST",
         "/",
-        "ADM001",
+        "AA7K2P",
         {
             "name": "Apollo",
             "budget": 1000,
-            "manager_id": user_id("MGR001"),
+            "manager_id": user_id("MM4R8T"),
             "status": "active",
             "start_date": start.isoformat(),
             "predicted_end_date": end.isoformat(),
@@ -50,24 +50,24 @@ def running(fresh_db: None) -> int:
         projects,
         "POST",
         f"/{project['id']}/assignments",
-        "MGR001",
-        {"user_id": user_id("EMP001"), "hours_per_week": 10},
+        "MM4R8T",
+        {"user_id": user_id("EE3H9W"), "hours_per_week": 10},
     )
     assert status == 201
     return project["id"]
 
 
 def test_project_payload_includes_insights(running: int) -> None:
-    _, project = call(projects, "GET", f"/{running}", "MGR001")
+    _, project = call(projects, "GET", f"/{running}", "MM4R8T")
     assert [i["code"] for i in project["insights"]] == ["budget_at_risk", "no_milestones"]
     assert project["milestones"] == {"total": 0, "completed": 0, "overdue": 0}
 
-    _, as_employee = call(projects, "GET", f"/{running}", "EMP001")
+    _, as_employee = call(projects, "GET", f"/{running}", "EE3H9W")
     assert [i["code"] for i in as_employee["insights"]] == ["no_milestones"]  # no money insights
 
 
 def test_admin_dashboard(running: int) -> None:
-    status, body = call(projects, "GET", "/dashboard", "ADM001")
+    status, body = call(projects, "GET", "/dashboard", "AA7K2P")
     assert (status, body["role"]) == (200, "admin")
     stats = body["stats"]
     assert (stats["active_projects"], stats["over_budget"], stats["needing_attention"]) == (1, 0, 1)
@@ -77,7 +77,7 @@ def test_admin_dashboard(running: int) -> None:
 
 
 def test_manager_dashboard_shows_team_load(running: int) -> None:
-    status, body = call(projects, "GET", "/dashboard", "MGR001")
+    status, body = call(projects, "GET", "/dashboard", "MM4R8T")
     assert (status, body["role"], body["stats"]["my_projects"]) == (200, "manager", 1)
     [member] = body["team"]
     assert (member["first_name"], member["hours_this_week"], member["available"]) == ("Eli", 10.0, 30.0)
@@ -90,10 +90,10 @@ def test_employee_dashboard_shows_week_and_milestones(running: int) -> None:
         projects,
         "POST",
         f"/{running}/milestones",
-        "MGR001",
+        "MM4R8T",
         {"title": "Kick-off", "start_date": monday.isoformat(), "due_date": (monday + timedelta(days=9)).isoformat()},
     )
-    status, body = call(projects, "GET", "/dashboard", "EMP001")
+    status, body = call(projects, "GET", "/dashboard", "EE3H9W")
     assert (status, body["role"]) == (200, "employee")
     assert (body["stats"]["hours_this_week"], body["stats"]["capacity"]) == (10.0, 40.0)
     assert [p["name"] for p in body["projects"]] == ["Apollo"]
@@ -102,18 +102,18 @@ def test_employee_dashboard_shows_week_and_milestones(running: int) -> None:
 
 
 def test_salary_rise_is_allowed_and_names_projects_pushed_over_budget(running: int) -> None:
-    status, _ = call(users, "PATCH", f"/{user_id('EMP001')}", "ADM001", {"salary": 208000})
+    status, _ = call(users, "PATCH", f"/{user_id('EE3H9W')}", "AA7K2P", {"salary": 208000})
     assert status == 200
     with db.transaction() as cur:
         cur.execute("SELECT summary FROM audit_log WHERE action = 'user.update' ORDER BY id DESC LIMIT 1")
         assert cur.fetchone()["summary"].endswith("now over budget: Apollo")
-    _, project = call(projects, "GET", f"/{running}", "MGR001")
+    _, project = call(projects, "GET", f"/{running}", "MM4R8T")
     assert project["over_budget"] is True
     assert project["insights"][0]["code"] == "over_budget"
 
 
 def test_salary_cut_is_not_flagged(running: int) -> None:
-    call(users, "PATCH", f"/{user_id('EMP001')}", "ADM001", {"salary": 52000})
+    call(users, "PATCH", f"/{user_id('EE3H9W')}", "AA7K2P", {"salary": 52000})
     with db.transaction() as cur:
         cur.execute("SELECT summary FROM audit_log WHERE action = 'user.update' ORDER BY id DESC LIMIT 1")
         assert "over budget" not in cur.fetchone()["summary"]

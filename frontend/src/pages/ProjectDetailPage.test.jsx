@@ -27,7 +27,7 @@ describe('ProjectDetailPage', () => {
   it('shows the project overview', async () => {
     renderAs('admin');
     expect(await screen.findByRole('heading', { name: 'Apollo' })).toBeInTheDocument();
-    expect(screen.getByText('Managed by Morgan Manager (MGR001)')).toBeInTheDocument();
+    expect(screen.getByText('Managed by Morgan Manager (MM4R8T)')).toBeInTheDocument();
     expect(screen.getByText('80 h')).toBeInTheDocument();
     expect(screen.getByText('$50,000')).toBeInTheDocument();
     expect(screen.getByText('$3,000 projected labour · $47,000 left')).toBeInTheDocument();
@@ -116,7 +116,7 @@ describe('ProjectDetailPage', () => {
     expect(await within(dialog).findByText(/no longer active/)).toBeInTheDocument();
 
     await userEvent.click(within(dialog).getByRole('combobox', { name: /^New project manager/ }));
-    await userEvent.click(await screen.findByRole('option', { name: 'Morgan Manager (MGR001)' }));
+    await userEvent.click(await screen.findByRole('option', { name: 'Morgan Manager (MM4R8T)' }));
     await userEvent.click(within(dialog).getByRole('button', { name: 'Reactivate' }));
     expect(reactivate).toHaveBeenLastCalledWith(7, { manager_id: TEST_USERS.manager.id });
     expect(await screen.findByText('Apollo reactivated')).toBeInTheDocument();

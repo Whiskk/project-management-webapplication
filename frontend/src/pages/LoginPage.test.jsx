@@ -34,10 +34,10 @@ describe('LoginPage', () => {
     // signed in and was sent to that page (showing an access error).
     const auth = anonymous({ login: vi.fn().mockResolvedValue({}) });
     renderLogin(auth, { pathname: '/login', state: { from: { pathname: '/projects' } } });
-    await userEvent.type(screen.getByLabelText(/Employee ID/), ' emp001 ');
+    await userEvent.type(screen.getByLabelText(/Employee ID/), ' ee3h9w ');
     await userEvent.type(screen.getByLabelText(/Password/), 'Empl01');
     await userEvent.click(screen.getByRole('button', { name: 'Sign in' }));
-    expect(auth.login).toHaveBeenCalledWith('emp001', 'Empl01');
+    expect(auth.login).toHaveBeenCalledWith('ee3h9w', 'Empl01');
     expect(await screen.findByText('Dashboard page')).toBeInTheDocument();
     expect(screen.queryByText('Projects page')).not.toBeInTheDocument();
   });
@@ -47,7 +47,7 @@ describe('LoginPage', () => {
       login: vi.fn().mockRejectedValue(new ApiError(401, 'unauthorized', 'Invalid employee ID or password')),
     });
     renderLogin(auth);
-    await userEvent.type(screen.getByLabelText(/Employee ID/), 'EMP001');
+    await userEvent.type(screen.getByLabelText(/Employee ID/), 'EE3H9W');
     await userEvent.type(screen.getByLabelText(/Password/), 'wrong1');
     await userEvent.click(screen.getByRole('button', { name: 'Sign in' }));
     expect(await screen.findByText('Invalid employee ID or password')).toBeInTheDocument();

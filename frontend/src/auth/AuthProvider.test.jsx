@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { jsonResponse, mockFetchSequence } from '../test/fetch';
 
-const USER = { id: 3, employee_id: 'EMP001', first_name: 'Eli', last_name: 'Employee', role: 'employee' };
+const USER = { id: 3, employee_id: 'EE3H9W', first_name: 'Eli', last_name: 'Employee', role: 'employee' };
 const TOKENS = { access_token: 'a1', refresh_token: 'r1', expires_in: 900 };
 
 /** Load fresh module copies so session state from other tests does not leak in. */
@@ -19,7 +19,7 @@ async function setup() {
       <div>
         <p>status: {status}</p>
         <p>user: {user?.employee_id ?? 'none'}</p>
-        <button type="button" onClick={() => login('EMP001', 'Empl01')}>login</button>
+        <button type="button" onClick={() => login('EE3H9W', 'Empl01')}>login</button>
         <button type="button" onClick={logout}>logout</button>
       </div>
     );
@@ -43,7 +43,7 @@ describe('AuthProvider', () => {
     expect(screen.getByText('status: anonymous')).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole('button', { name: 'login' }));
-    expect(await screen.findByText('user: EMP001')).toBeInTheDocument();
+    expect(await screen.findByText('user: EE3H9W')).toBeInTheDocument();
     expect(fetchMock.mock.calls[0][0]).toBe('/api/auth/login');
     expect(JSON.parse(localStorage.getItem('projecthub.session')).accessToken).toBe('a1');
   });
@@ -68,7 +68,7 @@ describe('AuthProvider', () => {
     mockFetchSequence(jsonResponse(200, { ...TOKENS, user: USER }));
     await setup();
     await userEvent.click(screen.getByRole('button', { name: 'login' }));
-    await screen.findByText('user: EMP001');
+    await screen.findByText('user: EE3H9W');
 
     vi.spyOn(globalThis, 'fetch').mockRejectedValue(new TypeError('offline'));
     await act(() => userEvent.click(screen.getByRole('button', { name: 'logout' })));

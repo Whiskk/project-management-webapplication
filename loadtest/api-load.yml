@@ -2,7 +2,7 @@
 #
 # Run (Artillery is fetched on demand, it is not a project dependency):
 #   npx artillery@2 run loadtest/api-load.yml --target https://<cloudfront-domain> \
-#       --variables '{"password":"<MGR001 password>"}' --output loadtest/results.json
+#       --variables '{"password":"<MM4R8T password>"}' --output loadtest/results.json
 #   npx artillery@2 report loadtest/results.json   # optional HTML report
 #
 # Each virtual user signs in as the demo manager (a realistic, CPU-heavy
@@ -13,7 +13,7 @@
 config:
   target: "http://localhost:3001"
   variables:
-    employee_id: "MGR001"
+    employee_id: "MM4R8T"
     password: "Mngr01"
   phases:
     - name: warm-up (wakes Aurora and Lambda containers)

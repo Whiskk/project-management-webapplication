@@ -8,7 +8,7 @@ import ProfilePage from './ProfilePage';
 describe('ProfilePage', () => {
   it('shows read-only details and disables save until something changes', () => {
     renderWithProviders(<ProfilePage />, { auth: fakeAuth({ user: TEST_USERS.employee }) });
-    expect(screen.getByText('EMP001')).toBeInTheDocument();
+    expect(screen.getByText('EE3H9W')).toBeInTheDocument();
     expect(screen.getByText('Software Engineer')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Save changes' })).toBeDisabled();
   });

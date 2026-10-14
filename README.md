@@ -27,7 +27,7 @@ Built for the Citi Coding Workshop (Full Stack track) on the required stack: **R
 
 | Role | Can do |
 |---|---|
-| **Admin** | Create every account (employee IDs and 6-character passwords are generated; the password is shown once). Create, edit, archive and reactivate projects and assign their manager. Approve or reject managers' project requests (approving creates the project, optionally with adjusted budget/dates/manager). See the organisation dashboard, the full **Audit log**, and each project's history. Run the budget check. |
+| **Admin** | Create every account. **Employee IDs are generated from the person's initials plus 4 random characters** (e.g. Eli Employee → `EE3H9W`; letters and digits without look-alikes like 0/O and 1/I/L) and never change, even if the person is renamed; the 6-character password is generated and shown once. Create, edit, archive and reactivate projects and assign their manager. Approve or reject managers' project requests (approving creates the project, optionally with adjusted budget/dates/manager). See the organisation dashboard, the full **Audit log**, and each project's history. Run the budget check. |
 | **Manager** | See and run the projects they manage: schedule, budget, status, **milestones with dependencies**, and **staffing** (hours per week). Staff any employee; staffing someone else's report sends the hours to that employee's manager for **approval**. Approve or reject hours requested for their own reports. Request new projects. Edit their direct reports' basic details. Dashboard with their team's load this week. |
 | **Employee** | See the projects they're assigned to, their hours (and hours awaiting approval), the team and milestones - never budgets or costs. Update their own name and email. Dashboard showing their week against 40 hours and upcoming milestones. |
 
@@ -80,9 +80,9 @@ Open **http://localhost:3000** and sign in with a demo account (local only - see
 
 | Role | Employee ID | Password |
 |---|---|---|
-| Admin | `ADM001` | `Admin1` |
-| Manager | `MGR001` | `Mngr01` |
-| Employee | `EMP001` | `Empl01` |
+| Admin | `AA7K2P` | `Admin1` |
+| Manager | `MM4R8T` | `Mngr01` |
+| Employee | `EE3H9W` | `Empl01` |
 
 After editing `backend/_shared/pm_core`, run `./bin/sync-shared.sh` (LocalStack runs the service folders directly, so changes are live).
 
@@ -90,7 +90,7 @@ After editing `backend/_shared/pm_core`, run `./bin/sync-shared.sh` (LocalStack 
 
 ```sh
 cd backend && python3 -m venv .venv && .venv/bin/pip install -r requirements-dev.txt
-.venv/bin/pytest                      # 312 unit + integration tests (uses a separate pm_test database)
+.venv/bin/pytest                      # 323 unit + integration tests (uses a separate pm_test database)
 .venv/bin/ruff check . && .venv/bin/ruff format --check .
 cd ../frontend && npm test            # 125 component/service tests (Vitest + React Testing Library)
 npm run lint && npm run e2e           # ESLint; 8 Playwright end-to-end journeys against the running app
@@ -111,7 +111,9 @@ cd .. && ./bin/smoke-test.sh          # 62 live API checks (local by default, or
 source ENVIRONMENT.config && aws logs tail /aws/lambda/coding-workshop-health-<app-id> --since 24h | grep "one-time passwords"
 ```
 
-Sign in as `ADM001` with that password and reset the others from **Users**.
+Sign in as `AA7K2P` with that password and reset the others from **Users**.
+
+> Deployments seeded before the initials-based ID format list the demo passwords under the old IDs (`ADM001`, `MGR001`, `EMP001`). Migration 5 converted those accounts to `AA7K2P`, `MM4R8T` and `EE3H9W` with the same passwords, and logged the old → new mapping for any other users (`grep "Employee IDs converted"` in the same log).
 
 ## Repository layout
 
