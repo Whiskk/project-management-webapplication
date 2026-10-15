@@ -94,6 +94,18 @@
       "value": ""
     },
     {
+      "key": "newHireEmployeeId",
+      "value": ""
+    },
+    {
+      "key": "newHirePassword",
+      "value": ""
+    },
+    {
+      "key": "newHireToken",
+      "value": ""
+    },
+    {
       "key": "projectId",
       "value": ""
     },
@@ -1089,7 +1101,161 @@
                   "    pm.expect(body.temporary_password).to.have.lengthOf(6);",
                   "    pm.expect(body.user.is_active).to.eql(true);",
                   "});",
-                  "if (pm.response.code < 300) pm.collectionVariables.set(\"newHireId\", String(pm.response.json().user.id));"
+                  "if (pm.response.code < 300) pm.collectionVariables.set(\"newHireId\", String(pm.response.json().user.id));",
+                  "if (pm.response.code < 300) pm.collectionVariables.set(\"newHireEmployeeId\", String(pm.response.json().user.employee_id));",
+                  "if (pm.response.code < 300) pm.collectionVariables.set(\"newHirePassword\", String(pm.response.json().temporary_password));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "The new hire signs in with the temporary password",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "login"
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"employee_id\": \"{{newHireEmployeeId}}\",\n  \"password\": \"{{newHirePassword}}\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Must choose a password\", () => {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.user.must_change_password).to.eql(true);",
+                  "});",
+                  "if (pm.response.code < 300) pm.collectionVariables.set(\"newHireToken\", String(pm.response.json().access_token));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Change password v2 refuses fewer than 15 characters",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/v2/change-password",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "v2",
+                "change-password"
+              ]
+            },
+            "description": "14 characters: accepted by v1, refused by v2.",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{newHireToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"current_password\": \"{{newHirePassword}}\",\n  \"new_password\": \"Postman2026abc\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"new_password: at least 15 characters\", () => pm.expect(pm.response.json().error.details.new_password).to.include(\"at least 15 characters\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Change password v2 accepts 15 characters",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/v2/change-password",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "v2",
+                "change-password"
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{newHireToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"current_password\": \"{{newHirePassword}}\",\n  \"new_password\": \"Postman2026abcd\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"The temporary password is released\", () => {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.must_change_password).to.eql(false);",
+                  "});"
                 ]
               }
             }

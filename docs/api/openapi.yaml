@@ -166,7 +166,7 @@ paths:
       summary: Choose a new password
       description: |
         Required after an admin creates the account or resets its password. Until then, every other endpoint except
-        `me` and `logout` returns 403 `password_change_required`.
+        `me`, `logout` and `v2/change-password` returns 403 `password_change_required`.
       requestBody:
         required: true
         content:
@@ -180,6 +180,37 @@ paths:
                 new_password:
                   type: string
                   minLength: 8
+                  maxLength: 128
+                  description: At least one letter and one number, and different from the current password.
+      responses:
+        "200":
+          description: Password changed; `must_change_password` is now false.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CurrentUser" }
+        "400": { $ref: "#/components/responses/ValidationFailed" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /api/auth/v2/change-password:
+    post:
+      tags: [Auth]
+      operationId: changePasswordV2
+      summary: Choose a new password (v2, at least 15 characters)
+      description: |
+        Version 2 of `change-password`. Behaves the same (including releasing a temporary password), but the new
+        password must be at least 15 characters. Version 1 is unchanged.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [current_password, new_password]
+              properties:
+                current_password: { type: string, maxLength: 128 }
+                new_password:
+                  type: string
+                  minLength: 15
                   maxLength: 128
                   description: At least one letter and one number, and different from the current password.
       responses:

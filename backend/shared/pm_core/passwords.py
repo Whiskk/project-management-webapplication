@@ -26,18 +26,19 @@ def generate_password(length: int = PASSWORD_LENGTH) -> str:
 
 
 MIN_CHOSEN_LENGTH = 8
+MIN_CHOSEN_LENGTH_V2 = 15  # POST /api/auth/v2/change-password
 MAX_CHOSEN_LENGTH = 128
 
 
-def check_new_password(new_password: str, current_password: str) -> str | None:
+def check_new_password(new_password: str, current_password: str, min_length: int = MIN_CHOSEN_LENGTH) -> str | None:
     """
     Rules for a password a user chooses themselves. Returns a message, or None if acceptable.
 
     Generated temporary passwords (6 characters) can never satisfy these, so a
     temporary password cannot simply be "changed" to itself.
     """
-    if len(new_password) < MIN_CHOSEN_LENGTH:
-        return f"Must be at least {MIN_CHOSEN_LENGTH} characters"
+    if len(new_password) < min_length:
+        return f"Must be at least {min_length} characters"
     if len(new_password) > MAX_CHOSEN_LENGTH:
         return f"Must be at most {MAX_CHOSEN_LENGTH} characters"
     if not any(ch.isalpha() for ch in new_password) or not any(ch.isdigit() for ch in new_password):

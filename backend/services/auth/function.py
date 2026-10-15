@@ -6,6 +6,7 @@ Routes (under /api/auth):
     POST /refresh  {refresh_token}         -> tokens + user
     GET  /me                               -> current user
     POST /change-password  {current_password, new_password} -> current user
+    POST /v2/change-password                                 -> same, new password >= 15 characters
     POST /logout                           -> 204 (audited; tokens are discarded client-side)
 
 Accounts created (or reset) by an admin get a temporary password and must
@@ -134,6 +135,17 @@ def me(request: Request) -> Response:
 @auth.require_auth(allow_pending_password_change=True)
 def change_password(request: Request) -> Response:
     """Replace your own password (required after an admin issues a temporary one)."""
+    return _change_password(request, passwords.MIN_CHOSEN_LENGTH)
+
+
+@router.post("/v2/change-password")
+@auth.require_auth(allow_pending_password_change=True)
+def change_password_v2(request: Request) -> Response:
+    """Same as v1, but the new password must be at least 15 characters."""
+    return _change_password(request, passwords.MIN_CHOSEN_LENGTH_V2)
+
+
+def _change_password(request: Request, min_length: int) -> Response:
     data = validate(request.body, CHANGE_PASSWORD_SPEC)
     actor = request.actor
     with transaction() as cur:
@@ -141,7 +153,7 @@ def change_password(request: Request) -> Response:
         row = cur.fetchone()
         if not passwords.verify_password(data["current_password"], row["password_hash"]):
             raise ValidationError({"current_password": WRONG_CURRENT_MESSAGE})
-        problem = passwords.check_new_password(data["new_password"], data["current_password"])
+        problem = passwords.check_new_password(data["new_password"], data["current_password"], min_length)
         if problem:
             raise ValidationError({"new_password": problem})
         cur.execute(

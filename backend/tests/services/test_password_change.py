@@ -127,6 +127,46 @@ def test_anyone_can_change_their_password_later(fresh_db: None) -> None:
     assert sign_in("EE3H9W", "Brighter9day")["user"]["must_change_password"] is False
 
 
+@pytest.mark.parametrize(
+    ("new_password", "message"),
+    [
+        ("Sunny2026", "Must be at least 15 characters"),  # fine for v1
+        ("Sunny2026Sunny", "Must be at least 15 characters"),  # 14
+        ("lettersonlylonger", "Must contain at least one letter and one number"),
+        ("x1" * 70, "Must be at most 128 characters"),
+    ],
+)
+def test_v2_new_password_rules(fresh_db: None, new_password: str, message: str) -> None:
+    employee_id, temporary = create_new_hire()
+    token = sign_in(employee_id, temporary)["access_token"]
+    body = {"current_password": temporary, "new_password": new_password}
+    status, response = auth_call("/v2/change-password", body, token)
+    assert (status, response["error"]["details"]["new_password"]) == (400, message)
+
+
+def test_v2_accepts_15_characters_and_unlocks_the_account(fresh_db: None) -> None:
+    employee_id, temporary = create_new_hire()
+    token = sign_in(employee_id, temporary)["access_token"]
+    status, user = auth_call(
+        "/v2/change-password", {"current_password": temporary, "new_password": "Sunny2026Sunny1"}, token
+    )
+    assert (status, user["must_change_password"]) == (200, False)
+    assert sign_in(employee_id, "Sunny2026Sunny1")["user"]["must_change_password"] is False
+
+    with db.transaction() as cur:
+        cur.execute("SELECT summary FROM audit_log WHERE action = 'auth.password_change'")
+        assert cur.fetchone()["summary"].endswith("changed their password (replacing a temporary password)")
+
+
+def test_v2_checks_the_current_password_and_needs_a_token(fresh_db: None) -> None:
+    employee_id, temporary = create_new_hire()
+    token = sign_in(employee_id, temporary)["access_token"]
+    body = {"current_password": "wrong1", "new_password": "Sunny2026Sunny1"}
+    status, response = auth_call("/v2/change-password", body, token)
+    assert (status, response["error"]["details"]["current_password"]) == (400, "Current password is incorrect")
+    assert auth_call("/v2/change-password", body)[0] == 401
+
+
 def test_admin_reset_forces_a_change_again(fresh_db: None) -> None:
     with db.transaction() as cur:
         cur.execute("SELECT id FROM users WHERE employee_id = 'EE3H9W'")

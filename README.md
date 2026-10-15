@@ -46,7 +46,7 @@ These are enforced **on the server** (the UI previews them, but the API is the g
 - **Milestones:** start on/after the project start; can't start before their dependencies are due; can't be worked on until dependencies are completed; no circular dependencies; can't be deleted while others depend on them. A due date after the predicted end is allowed but flagged.
 - **Tasks:** a checklist inside each milestone. A task has at most one assignee, who must be an approved member of the project's team; the assignee, the project's manager or an admin can tick it off (anyone else is refused and audited). Tasks can't be ticked off while their milestone waits on unfinished dependencies; a milestone can't be completed while it has open tasks, and a completed milestone takes no new or reopened tasks. Removing someone from a project unassigns their open tasks (finished tasks keep who did them).
 - **Nothing is deleted:** projects are archived (read-only, hidden by default) and users deactivated. An employee still on current projects can't be deactivated, and a manager with reports or projects can't be demoted until they're reassigned. The last admin can't be removed.
-- **Temporary passwords are single-use in practice:** until a user with an admin-issued password chooses their own (≥ 8 characters, a letter and a number, different from the temporary one), every API call except the change-password flow is refused (403 `password_change_required`), so the step can't be bypassed. Anyone can change their password later from My profile.
+- **Temporary passwords are single-use in practice:** until a user with an admin-issued password chooses their own (≥ 8 characters, a letter and a number, different from the temporary one; ≥ 15 characters through `POST /api/auth/v2/change-password`), every API call except the change-password flow is refused (403 `password_change_required`), so the step can't be bypassed. Anyone can change their password later from My profile.
 - **Audit log:** every change, sign-in, sign-out and *denied attempt* is recorded with time, who (ID, name, role), what, and a field-by-field before/after. It's written in the **same transaction** as the change and the database **rejects UPDATE/DELETE/TRUNCATE** on it. Salaries are redacted; passwords never logged. Admins see everything; managers see only their own entries, their current direct reports' and failed sign-ins against those accounts (enforced in the query, not just hidden in the UI).
 - **Insights** (rule-based, not AI): over budget, budget ≥ 90% committed, overdue milestones, past predicted end with work open, milestones slipping past the end, active with no team, no milestones, staffing awaiting approval.
 
@@ -78,7 +78,7 @@ graph LR
 - **Swagger UI in the app:** open **`/api-docs`** on any running copy ([live](https://d37hjhs1g613o6.cloudfront.net/api-docs), or http://localhost:3000/api-docs). *Try it out* calls the API of the site you're on: run `login`, copy the `access_token`, click **Authorize**.
 - **SwaggerHub:** *Create New → Import and Document API*, then paste `https://d37hjhs1g613o6.cloudfront.net/openapi.yaml` (or upload the file).
 - **Kept in sync:** `backend/tests/unit/test_openapi.py` fails if a route is added, removed or renamed without updating the spec, and the spec passes [Redocly](https://redocly.com/docs/cli/) lint (`npx @redocly/cli@1.25.11 lint --config docs/api/redocly.yaml docs/api/openapi.yaml`).
-- **Postman suite:** [postman/project-hub.postman_collection.json](./postman/project-hub.postman_collection.json): 90 requests and 301 assertions in 10 folders, run in order as one journey. It signs in as each role, creates its own clearly named data, checks every rule and refusal (400/401/403/404/405/409) and cleans up after itself. Import it into Postman with the [local](./postman/local.postman_environment.json) or [AWS](./postman/aws.postman_environment.json) environment (on AWS, fill in the three passwords), or run it from a terminal with Newman:
+- **Postman suite:** [postman/project-hub.postman_collection.json](./postman/project-hub.postman_collection.json): 93 requests and 311 assertions in 10 folders, run in order as one journey. It signs in as each role, creates its own clearly named data, checks every rule and refusal (400/401/403/404/405/409) and cleans up after itself. Import it into Postman with the [local](./postman/local.postman_environment.json) or [AWS](./postman/aws.postman_environment.json) environment (on AWS, fill in the three passwords), or run it from a terminal with Newman:
 
 ```sh
 ./bin/api-tests.sh            # local stack
@@ -109,12 +109,12 @@ After editing backend code, run `./bin/build-backend.sh` (about a second); Local
 
 ```sh
 cd backend && python3 -m venv .venv && .venv/bin/pip install -r requirements-dev.txt
-.venv/bin/pytest                      # 378 unit + integration tests (uses a separate pm_test database)
+.venv/bin/pytest                      # 384 unit + integration tests (uses a separate pm_test database)
 .venv/bin/ruff check . && .venv/bin/ruff format --check .
 cd ../frontend && npm test            # 185 component/service tests (Vitest + React Testing Library)
 npm run lint && npm run e2e           # ESLint; 22 Playwright journeys + 5 axe accessibility scans
 cd .. && ./bin/smoke-test.sh          # 75 live API checks (local by default, or pass a URL)
-./bin/api-tests.sh                    # Postman collection via Newman: 90 requests, 301 assertions
+./bin/api-tests.sh                    # Postman collection via Newman: 93 requests, 311 assertions
 ```
 
 ## Deploying to AWS

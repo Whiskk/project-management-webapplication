@@ -7,12 +7,12 @@ Results below are from **14 October 2026**, from local runs of the latest code a
 
 | Layer | Tool | Tests | Result | Coverage |
 |---|---|---|---|---|
-| Backend unit + integration | pytest (+ pytest-cov) against a real PostgreSQL `pm_test` database | **378** | ✅ all pass | **98%** of backend code (2,173 statements, 37 uncovered) |
+| Backend unit + integration | pytest (+ pytest-cov) against a real PostgreSQL `pm_test` database | **384** | ✅ all pass | **98%** of backend code (2,180 statements, 37 uncovered) |
 | Frontend components + services | Vitest + React Testing Library | **185** | ✅ all pass | **91.8% lines**, 90.6% statements, 86.6% branches, 83.5% functions |
 | End-to-end (browser) | Playwright (Chromium desktop + Pixel 7 mobile) | **22 journeys** | ✅ all pass locally (18 also confirmed on AWS; the 4 newest not yet run there) | all critical user paths (below) |
 | Accessibility | axe-core in Playwright, WCAG 2.0/2.1/2.2 A and AA | **5 scans, 20+ screens** | ✅ no violations | every page for every role, key dialogs, error states, phone menu |
-| API test suite | Postman collection run by Newman (`bin/api-tests.sh`) | **90 requests, 301 assertions** | ✅ 301/301 locally | every service, role rule and business-rule refusal |
-| API contract | OpenAPI 3 spec; Redocly lint; pytest check against the routers | **52 operations** | ✅ valid, and in sync with the code | every route the services register |
+| API test suite | Postman collection run by Newman (`bin/api-tests.sh`) | **93 requests, 311 assertions** | ✅ 311/311 locally | every service, role rule and business-rule refusal |
+| API contract | OpenAPI 3 spec; Redocly lint; pytest check against the routers | **53 operations** | ✅ valid, and in sync with the code | every route the services register |
 | Live API smoke test | `bin/smoke-test.sh` (curl) | **75 checks** | ✅ 75/75 **locally and on AWS** | every service and business rule |
 | Load | Artillery | 700 virtual users, 4,200 requests | ✅ 0 errors on AWS | see [Performance](#performance) |
 | Static analysis | ruff (Python), ESLint (JS), bandit (security), npm audit | - | ✅ all clean | - |
@@ -144,7 +144,7 @@ To watch the journeys run (e.g. for a demo), from `frontend/`: `npx playwright t
 | 8. Budget monitor | 2 | Admin-only on-demand budget check and its result |
 | 9. Clean up | 7 | Archived projects are read-only and hidden from employees; the new hire is deactivated; everyone signs out |
 
-**Result:** 90/90 requests, **301/301 assertions** locally (≈4 s). The suite also passed a second consecutive run, which confirms it is repeatable. Run it in Postman (*Run collection* with an environment from `postman/`) or with `./bin/api-tests.sh [aws]`.
+**Result:** 93/93 requests, **311/311 assertions** locally (≈4 s). The suite also passed a second consecutive run, which confirms it is repeatable. Run it in Postman (*Run collection* with an environment from `postman/`) or with `./bin/api-tests.sh [aws]`.
 
 The OpenAPI spec ([docs/api/openapi.yaml](./docs/api/openapi.yaml)) is checked two ways: Redocly lint (valid OpenAPI 3.0.3, examples match their schemas) and a pytest check that the documented routes match the routers exactly.
 
