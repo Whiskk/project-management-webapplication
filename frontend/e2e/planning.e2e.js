@@ -2,37 +2,23 @@ import fs from 'node:fs/promises';
 import { expect, test } from '@playwright/test';
 import { archiveCurrentProject, createProject, signIn, signOut, unique } from './helpers';
 
-const iso = (date) => date.toISOString().slice(0, 10);
-const daysFromNow = (days) => {
-  const date = new Date();
-  date.setUTCDate(date.getUTCDate() + days);
-  return date;
-};
-/** Next week's Monday, as the availability table labels it ("Nov 2"). */
-function nextMondayLabel() {
-  const date = new Date();
-  date.setDate(date.getDate() + ((8 - date.getDay()) % 7 || 7));
-  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-}
+// A fortnight far ahead that no other test (or real work) books, so Eli always has hours free.
+const PROJECT = { start: '2033-05-09', end: '2033-05-20' };
 
-/** Booked hours in Eli's "next week" cell of the availability table. */
-async function eliBookedNextWeek(page) {
-  await page.goto('/availability');
+/** Booked hours in Eli's cell for the week of 9 May 2033 (the first column, opened by URL). */
+async function eliBookedThatWeek(page) {
+  await page.goto(`/availability?start=${PROJECT.start}`);
   const table = page.getByRole('table');
-  const column = await table.getByRole('columnheader').allTextContents();
-  const index = column.findIndex((text) => text.includes(nextMondayLabel()));
-  expect(index, 'next week is a column').toBeGreaterThan(0);
+  await expect(table.getByRole('columnheader', { name: /May 9/ })).toBeVisible({ timeout: 30_000 });
   const row = table.getByRole('row').filter({ has: page.getByRole('rowheader', { name: /Eli Employee/ }) });
-  const cell = row.getByRole('cell').nth(index - 1);
-  const [, booked] = (await cell.textContent()).match(/([\d.]+) h booked/);
+  const [, booked] = (await row.getByRole('cell').first().textContent()).match(/([\d.]+) h booked/);
   return Number(booked);
 }
 
 test('managers see who is free, staffing shows up there, and the employee is told', async ({ page }) => {
   const name = unique('Planning');
-  // Today to two weeks out, so next week (Monday to Friday) is fully inside the project.
   await signIn(page, 'admin');
-  const projectUrl = await createProject(page, name, { start: iso(daysFromNow(0)), end: iso(daysFromNow(13)) });
+  const projectUrl = await createProject(page, name, PROJECT);
   // Admins see how the budget figure is worked out.
   await page.getByRole('button', { name: 'About projected labour cost' }).click();
   await expect(page.getByRole('dialog', { name: 'Projected labour cost' })).toContainText('annual salary ÷ 2,080');
@@ -42,7 +28,7 @@ test('managers see who is free, staffing shows up there, and the employee is tol
   await signIn(page, 'manager');
   await page.getByRole('link', { name: 'Availability' }).click();
   await expect(page.getByRole('heading', { name: 'Team availability', level: 1 })).toBeVisible();
-  const before = await eliBookedNextWeek(page);
+  const before = await eliBookedThatWeek(page);
 
   await page.goto(projectUrl);
   await page.getByRole('button', { name: 'Assign' }).click();
@@ -53,7 +39,7 @@ test('managers see who is free, staffing shows up there, and the employee is tol
   await assign.getByRole('button', { name: 'Assign' }).click();
   await expect(page.getByRole('table', { name: 'Team' }).getByText('Eli Employee')).toBeVisible();
 
-  expect(await eliBookedNextWeek(page)).toBe(before + 3);
+  expect(await eliBookedThatWeek(page)).toBe(before + 3);
   await signOut(page);
 
   // Eli's dashboard says what changed, in plain words.

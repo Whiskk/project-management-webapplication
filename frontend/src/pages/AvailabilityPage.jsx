@@ -1,4 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router';
 import Alert from '@mui/material/Alert';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
@@ -92,7 +93,13 @@ export default function AvailabilityPage() {
   const { user } = useAuth();
   const isManager = user.role === 'manager';
   const thisWeek = weekStart(todayIso());
-  const [start, setStart] = useState(thisWeek);
+  // The first week can come from the URL (?start=2033-05-09), so a window can be linked to.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const requested = searchParams.get('start');
+  const start = /^\d{4}-\d{2}-\d{2}$/.test(requested ?? '') && !Number.isNaN(Date.parse(requested))
+    ? weekStart(requested)
+    : thisWeek;
+  const setStart = (monday) => setSearchParams(monday === thisWeek ? {} : { start: monday }, { replace: true });
   const [scope, setScope] = useState(isManager ? 'team' : 'all');
   const [search, setSearch] = useState('');
 

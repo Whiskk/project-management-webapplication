@@ -28,7 +28,7 @@ function payload() {
   };
 }
 
-const renderPage = (user = TEST_USERS.manager) => renderWithProviders(<AvailabilityPage />, { auth: fakeAuth({ user }) });
+const renderPage = (user = TEST_USERS.manager, route = '/availability') => renderWithProviders(<AvailabilityPage />, { auth: fakeAuth({ user }), route });
 const rowNames = () => screen.getAllByRole('rowheader').map((cell) => within(cell).getByText(/Eli|Olive/).textContent);
 
 beforeEach(() => {
@@ -75,6 +75,18 @@ describe('AvailabilityPage', () => {
     ));
     await userEvent.click(screen.getByRole('button', { name: 'This week' }));
     await waitFor(() => expect(projectsApi.availability).toHaveBeenLastCalledWith({ start: MONDAY, weeks: 12 }, expect.anything()));
+  });
+
+  it('starts from the week given in the URL, moved back to its Monday', async () => {
+    renderPage(TEST_USERS.manager, '/availability?start=2033-05-11');
+    await screen.findByRole('table');
+    expect(projectsApi.availability).toHaveBeenCalledWith({ start: '2033-05-09', weeks: 12 }, expect.anything());
+  });
+
+  it('ignores a start date in the URL that is not a date', async () => {
+    renderPage(TEST_USERS.manager, '/availability?start=soon');
+    await screen.findByRole('table');
+    expect(projectsApi.availability).toHaveBeenCalledWith({ start: MONDAY, weeks: 12 }, expect.anything());
   });
 
   it('tells a manager with no reports to look at everyone', async () => {
