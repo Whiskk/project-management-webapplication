@@ -9,7 +9,7 @@ Results below are from **14 October 2026**, from local runs of the latest code a
 |---|---|---|---|---|
 | Backend unit + integration | pytest (+ pytest-cov) against a real PostgreSQL `pm_test` database | **428** | ✅ all pass | **98%** of backend code (2,413 statements, 40 uncovered) |
 | Frontend components + services | Vitest + React Testing Library | **204** | ✅ all pass | **91.5% lines**, 90.4% statements, 87.0% branches, 83.7% functions |
-| End-to-end (browser) | Playwright (Chromium desktop + Pixel 7 mobile) | **22 journeys** | ✅ all pass locally (18 also confirmed on AWS; the 4 newest not yet run there) | all critical user paths (below) |
+| End-to-end (browser) | Playwright (Chromium desktop + Pixel 7 mobile) | **24 journeys** | ✅ all pass on AWS | all critical user paths (below) |
 | Accessibility | axe-core in Playwright, WCAG 2.0/2.1/2.2 A and AA | **5 scans, 20+ screens** | ✅ no violations | every page for every role, key dialogs, error states, phone menu |
 | API test suite | Postman collection run by Newman (`bin/api-tests.sh`) | **98 requests, 329 assertions** | ✅ 329/329 locally and on AWS | every service, role rule and business-rule refusal |
 | API contract | OpenAPI 3 spec; Redocly lint; pytest check against the routers | **55 operations** | ✅ valid, and in sync with the code | every route the services register |
@@ -117,8 +117,10 @@ Run in real Chromium against the running app and backend; each run creates uniqu
 | Dashboard navigation | Dashboard tiles link to the matching pages |
 | Mobile layout (Pixel 7) | Slide-out navigation |
 | **API reference** | `/api-docs` opens Swagger UI with every service; *Try it out* on `GET /api/health` really calls the API; `/openapi.yaml` downloads |
+| **Planning** | Admin opens the ⓘ explanation of projected labour cost → manager opens Availability, staffs Eli 3 h on a far-future fortnight and sees his booked hours for that week go up by exactly 3 → Eli's What's new says he was added, linking to the project → admin archives it |
+| Audit CSV export | Admin filters the log to `auth.login` and exports it: the download is `audit-log-<date>.csv` with the header row and only matching entries |
 
-**Result:** 22/22 journeys locally. The 18 older journeys also pass against AWS; the four newest (managers' audit log, tasks, and the two API reference checks) haven't been run there yet. The API reference page goes live with the next frontend deploy.
+**Result:** 24/24 journeys pass against AWS.
 
 ### Accessibility (axe)
 
@@ -126,7 +128,7 @@ Run in real Chromium against the running app and backend; each run creates uniqu
 
 The first scan found two real issues, both fixed: sidebar links were direct children of a list (now wrapped in list items), and loading placeholders had a label but no role (now `progressbar`). Colour contrast passes in the dark theme.
 
-**Result:** 5/5, no violations; the full Playwright suite is 27/27 locally (≈3.8 min).
+**Result:** 5/5, no violations (the manager scan now includes the Availability page with everyone shown and its explanation open); the full Playwright suite is 29/29 on AWS.
 
 To watch the journeys run (e.g. for a demo), from `frontend/`: `npx playwright test --ui` (pick and replay tests step by step), or `npx playwright test --headed --project=desktop` (a real browser window).
 

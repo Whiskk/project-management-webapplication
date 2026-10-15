@@ -64,7 +64,8 @@ test('admins export the filtered audit log as a CSV file', async ({ page }) => {
     page.getByRole('button', { name: 'Export CSV (filtered)' }).click(),
   ]);
   expect(download.suggestedFilename()).toMatch(/^audit-log-\d{4}-\d{2}-\d{2}\.csv$/);
-  const lines = (await fs.readFile(await download.path(), 'utf8')).trim().split('\n');
+  // CSV lines end in \r\n (RFC 4180).
+  const lines = (await fs.readFile(await download.path(), 'utf8')).trim().split(/\r?\n/);
   expect(lines[0]).toBe('Time (UTC),Employee ID,Name,Role,Action,Outcome,Record type,Record ID,Project,Summary,Changes');
   expect(lines.length).toBeGreaterThan(1);
   expect(lines.slice(1).every((line) => line.includes(',auth.login,'))).toBe(true);
