@@ -23,6 +23,21 @@ export function formatShortDate(value) {
   return value ? shortDateFormatter.format(new Date(`${value.slice(0, 10)}T00:00:00Z`)) : '—';
 }
 
+const relativeFormatter = new Intl.RelativeTimeFormat('en-US', { numeric: 'auto' });
+// [unit, seconds in one unit, use the next unit from this many]
+const TIME_UNITS = [['minute', 60, 60], ['hour', 3600, 24], ['day', 86400, 7]];
+
+/** How long ago a timestamp was: "just now", "5 minutes ago", "yesterday", or a date after a week. */
+export function timeAgo(value, now = Date.now()) {
+  const seconds = (new Date(value).getTime() - now) / 1000;
+  if (Math.abs(seconds) < 60) return 'just now';
+  for (const [unit, size, limit] of TIME_UNITS) {
+    const amount = Math.round(seconds / size);
+    if (Math.abs(amount) < limit) return relativeFormatter.format(amount, unit);
+  }
+  return formatDate(value);
+}
+
 /** Format hours without trailing zeros: 7.5 -> "7.5 h", 40 -> "40 h". */
 export function formatHours(value) {
   return value === null || value === undefined ? '—' : `${Number(value).toLocaleString('en-US', { maximumFractionDigits: 1 })} h`;

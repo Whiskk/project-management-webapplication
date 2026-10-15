@@ -12,6 +12,7 @@ import NotFoundPage from './pages/NotFoundPage';
 // (AppShell shows a spinner in the content area while one loads).
 const ApprovalsPage = lazy(() => import('./pages/ApprovalsPage'));
 const AuditLogPage = lazy(() => import('./pages/AuditLogPage'));
+const AvailabilityPage = lazy(() => import('./pages/AvailabilityPage'));
 const ProfilePage = lazy(() => import('./pages/ProfilePage'));
 const ProjectDetailPage = lazy(() => import('./pages/ProjectDetailPage'));
 const ProjectsPage = lazy(() => import('./pages/ProjectsPage'));
@@ -38,6 +39,9 @@ export default function App() {
           <Route path="projects/:projectId" element={<ProjectDetailPage />} />
           <Route element={<RequirePermission permission="approvals.review" />}>
             <Route path="approvals" element={<ApprovalsPage />} />
+          </Route>
+          <Route element={<RequirePermission permission="availability.view" />}>
+            <Route path="availability" element={<AvailabilityPage />} />
           </Route>
           <Route element={<RequirePermission permission="audit.view" />}>
             <Route path="audit" element={<AuditLogPage />} />

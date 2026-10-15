@@ -7,17 +7,17 @@ Results below are from **14 October 2026**, from local runs of the latest code a
 
 | Layer | Tool | Tests | Result | Coverage |
 |---|---|---|---|---|
-| Backend unit + integration | pytest (+ pytest-cov) against a real PostgreSQL `pm_test` database | **384** | ✅ all pass | **98%** of backend code (2,180 statements, 37 uncovered) |
-| Frontend components + services | Vitest + React Testing Library | **185** | ✅ all pass | **91.8% lines**, 90.6% statements, 86.6% branches, 83.5% functions |
+| Backend unit + integration | pytest (+ pytest-cov) against a real PostgreSQL `pm_test` database | **424** | ✅ all pass | **98%** of backend code (2,402 statements, 40 uncovered) |
+| Frontend components + services | Vitest + React Testing Library | **204** | ✅ all pass | **91.5% lines**, 90.4% statements, 87.0% branches, 83.7% functions |
 | End-to-end (browser) | Playwright (Chromium desktop + Pixel 7 mobile) | **22 journeys** | ✅ all pass locally (18 also confirmed on AWS; the 4 newest not yet run there) | all critical user paths (below) |
 | Accessibility | axe-core in Playwright, WCAG 2.0/2.1/2.2 A and AA | **5 scans, 20+ screens** | ✅ no violations | every page for every role, key dialogs, error states, phone menu |
-| API test suite | Postman collection run by Newman (`bin/api-tests.sh`) | **93 requests, 311 assertions** | ✅ 311/311 locally | every service, role rule and business-rule refusal |
-| API contract | OpenAPI 3 spec; Redocly lint; pytest check against the routers | **53 operations** | ✅ valid, and in sync with the code | every route the services register |
+| API test suite | Postman collection run by Newman (`bin/api-tests.sh`) | **98 requests, 329 assertions** | ✅ 329/329 locally | every service, role rule and business-rule refusal |
+| API contract | OpenAPI 3 spec; Redocly lint; pytest check against the routers | **55 operations** | ✅ valid, and in sync with the code | every route the services register |
 | Live API smoke test | `bin/smoke-test.sh` (curl) | **75 checks** | ✅ 75/75 **locally and on AWS** | every service and business rule |
 | Load | Artillery | 700 virtual users, 4,200 requests | ✅ 0 errors on AWS | see [Performance](#performance) |
 | Static analysis | ruff (Python), ESLint (JS), bandit (security), npm audit | - | ✅ all clean | - |
 
-Rubric targets (`docs/full-stack.md`): backend ≥ 80% ✅ (98%), frontend ≥ 80% ✅ (91.8% lines, 83.5% functions), API endpoints ≥ 90% ✅, error handling ≥ 90% ✅, critical paths 100% E2E ✅.
+Rubric targets (`docs/full-stack.md`): backend ≥ 80% ✅ (98%), frontend ≥ 80% ✅ (91.5% lines, 83.7% functions), API endpoints ≥ 90% ✅, error handling ≥ 90% ✅, critical paths 100% E2E ✅.
 
 ## How to run
 
@@ -72,10 +72,12 @@ Every service is tested by calling its real Lambda `handler()` with Function URL
 | Milestones | Date rules, dependency rules, cycles, start/reopen rules, delete protection, progress and overdue tracking; can't complete with open tasks |
 | Tasks | Assignee must be an approved team member; only the assignee, project manager or an admin can tick off (others refused and audited, outsiders 404); waiting on milestone dependencies; completed milestones take no new/reopened tasks; deleting a milestone deletes its tasks; removing someone unassigns their open tasks; archived projects read-only; tasks scoped to their project; dashboard list |
 | Requests | Submit/withdraw/approve/reject; approval creates the project in the same transaction; failed approval creates nothing |
-| Audit | Managers see only their own and their direct reports' entries (other teams, managers, admins hidden; filters, counts and pagination stay in scope; reassignment moves history); same-transaction writes, rollback leaves no entry, append-only (UPDATE/DELETE/TRUNCATE rejected by the database), redaction, filters, no write routes |
+| Audit | Managers see only their own and their direct reports' entries (other teams, managers, admins hidden; filters, counts and pagination stay in scope; reassignment moves history); same-transaction writes, rollback leaves no entry, append-only (UPDATE/DELETE/TRUNCATE rejected by the database), redaction, filters, no write routes; CSV export (header row, filters and manager scope kept, spreadsheet formulas neutralised, employees refused) |
+| Availability | Booked hours per week split into confirmed and awaiting approval; uses each week's busiest day like the 40-hour rule (Mon-Tue and Wed-Fri projects aren't added together); archived projects free the time; the window snaps to Monday; only active employees; managers' own reports flagged; no project names returned; employees refused; invalid windows rejected |
+| What's new | An employee is told, in their own words and newest first, about being staffed, hour changes, cross-team requests and their outcome, new tasks, ticks by others and project date changes; budget-only edits, their own actions and projects they're not on are left out; nothing mentions money; changes since the previous sign-in are marked new; wording for every kind of change |
 | Monitor | Flags each over-budget change once, records recovery, admin-only trigger, scheduled events can't be forged over HTTP |
 | API contract | Every route registered by the six services appears in `docs/api/openapi.yaml` with the same method and path, and nothing documented is missing from the code; every `$ref` resolves; every authenticated operation documents 401; operation IDs are unique |
-| Regressions | Cross-connection lock deadlock (denied-attempt audit vs a locked row) - fixed with `FOR NO KEY UPDATE` and a lock timeout |
+| Regressions | Cross-connection lock deadlock (denied-attempt audit vs a locked row) - fixed with `FOR NO KEY UPDATE` and a lock timeout; the employee ID migration (5) still runs on an old database after migration 8 added a column to the audit log |
 
 ## Frontend tests (Vitest + React Testing Library)
 
@@ -85,7 +87,8 @@ Vitest is used instead of Jest: it is Vite's native runner with a Jest-compatibl
 - **API service functions** (mocked responses): every users and audit call sends the right method, URL, query string and body, passes abort signals through, and turns error responses into typed errors.
 - **Auth:** login form validation and errors, session restore, sign-out, route guards and permission guards.
 - **Schedule timeline:** week maths (Mondays, month ends, clamping), weekly totals of confirmed and pending hours, hours per day wording, and the timeline itself (bars, milestone states, pending and future projects, empty state).
-- **Pages and components:** users, projects, project detail (budget card, insights, archive/reactivate), team and assignment dialog (live cost/availability preview, approval note), milestones timeline and dialog, approvals, requests, audit log, role dashboards, badges and polling.
+- **Pages and components:** users, projects, project detail (budget card, insights, archive/reactivate), team and assignment dialog (live cost/availability preview, approval note), milestones timeline and dialog, approvals, requests, audit log (including the CSV export and its 5,000-row warning), team availability (team/everyone, search, moving the window), What's new (new markers, links, relative times), the ⓘ explanations (open, Escape, focus returns), role dashboards, badges and polling.
+- **File downloads:** the API client returns a Blob for CSV and still turns JSON errors into typed errors.
 
 ## End-to-end tests (Playwright)
 
@@ -135,16 +138,16 @@ To watch the journeys run (e.g. for a demo), from `frontend/`: `npx playwright t
 |---|---|---|
 | 0. Health | 2 | API and database up, schema migrated; unsupported methods get 405 |
 | 1. Auth | 11 | Unknown IDs refused like wrong passwords; per-field validation; unknown fields rejected; each role signs in; missing and forged tokens are 401; refresh works and an access token can't be used as a refresh token |
-| 2. Users | 13 | Role limits on listing and creating; every invalid field reported at once; employees need a manager; generated initials-based ID and one-time password; unique emails (case-insensitive); employees see only themselves; managers edit reports but not salaries; PUT alias |
+| 2. Users | 16 | Role limits on listing and creating; every invalid field reported at once; employees need a manager; generated initials-based ID and one-time password; unique emails (case-insensitive); employees see only themselves; managers edit reports but not salaries; PUT alias; the new hire changes their temporary password through v2, which refuses fewer than 15 characters |
 | 3. Projects | 8 | Admin-only creation; date validation; hidden projects are 404, not 403; search; managers edit their project but not its name |
-| 4. Staffing and approvals | 12 | 40-hour cap; own-report staffing is immediate; no duplicates; budget can't drop below projected cost; admin staffing waits for the employee's own manager, who (not the admin) approves; nothing left to approve twice; employees see the team and project without any money figures |
-| 5. Milestones and tasks | 21 | The project appears on the employee's schedule with its hours and milestones; milestone date and dependency rules; no circular dependencies; tasks only for approved team members; tasks wait on the milestone's dependencies; only the assignee, project manager or admin can tick; a milestone can't complete with open tasks; completed milestones keep their tasks closed; progress summary |
+| 4. Staffing and approvals | 15 | 40-hour cap; own-report staffing is immediate; no duplicates; budget can't drop below projected cost; admin staffing waits for the employee's own manager, who (not the admin) approves; nothing left to approve twice; employees see the team and project without any money figures; team availability shows the booked hours (totals only, no project names), is refused to employees and limited to 1-26 weeks |
+| 5. Milestones and tasks | 21 | The project appears on the employee's schedule with its hours and milestones, and their What's new says they were added (no money figures); milestone date and dependency rules; no circular dependencies; tasks only for approved team members; tasks wait on the milestone's dependencies; only the assignee, project manager or admin can tick; a milestone can't complete with open tasks; completed milestones keep their tasks closed; progress summary |
 | 6. Project requests | 8 | Managers only; a rejection needs a reason; decided requests can't be decided again; withdraw; managers see only their own |
-| 7. Audit log | 6 | Every step above was recorded against the project; refused attempts recorded as *denied*; managers see themselves and their reports but never admins, even when filtering for them; employees refused |
+| 7. Audit log | 8 | Every step above was recorded against the project; refused attempts recorded as *denied*; managers see themselves and their reports but never admins, even when filtering for them; the CSV export downloads the project's history; employees refused |
 | 8. Budget monitor | 2 | Admin-only on-demand budget check and its result |
 | 9. Clean up | 7 | Archived projects are read-only and hidden from employees; the new hire is deactivated; everyone signs out |
 
-**Result:** 93/93 requests, **311/311 assertions** locally (≈4 s). The suite also passed a second consecutive run, which confirms it is repeatable. Run it in Postman (*Run collection* with an environment from `postman/`) or with `./bin/api-tests.sh [aws]`.
+**Result:** 98/98 requests, **329/329 assertions** locally (≈4 s). The suite also passed a second consecutive run, which confirms it is repeatable. Run it in Postman (*Run collection* with an environment from `postman/`) or with `./bin/api-tests.sh [aws]`.
 
 The OpenAPI spec ([docs/api/openapi.yaml](./docs/api/openapi.yaml)) is checked two ways: Redocly lint (valid OpenAPI 3.0.3, examples match their schemas) and a pytest check that the documented routes match the routers exactly.
 
@@ -182,7 +185,7 @@ Run against the deployed app after each release (the smoke test and the Postman 
 
 ## Known gaps
 
-- **Frontend function coverage is 83.5%** (lines 91.8%). The uncovered functions are mostly small inline event handlers (dialog cancel buttons, menu close handlers) whose behaviour is exercised by the E2E suite.
+- **Frontend function coverage is 83.7%** (lines 91.5%). The uncovered functions are mostly small inline event handlers (dialog cancel buttons, menu close handlers) whose behaviour is exercised by the E2E suite.
 - **The 2% of backend code not covered** is defensive handling of failures that are hard to provoke locally: resetting a dropped database connection, the cloud-only SSL setting, an audit write that itself fails, and a few rarely used filter branches.
 - **The hourly budget-monitor schedule is only exercised on LocalStack.** On AWS the participant role is denied EventBridge (see README → Known limitations); the on-demand trigger is tested on both.
 - **Load testing used one demo manager account** for all virtual users (realistic per-request cost, but not many distinct users' data).

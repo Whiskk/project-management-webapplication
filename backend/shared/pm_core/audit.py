@@ -15,6 +15,7 @@ from decimal import Decimal
 from typing import Any
 
 import psycopg
+from psycopg import sql
 
 from pm_core import db
 
@@ -86,6 +87,7 @@ def record(
     project_id: int | None = None,
     outcome: str = "success",
     actor_employee_id: str | None = None,
+    subject_user_id: int | None = None,
 ) -> None:
     """
     Write one audit entry using the caller's cursor (same transaction).
@@ -103,26 +105,32 @@ def record(
         outcome: ``success`` or ``denied``.
         actor_employee_id: Employee id to record when there is no actor
             (e.g. the id typed in a failed login).
+        subject_user_id: The employee the change is about (their hours or
+            task), for their "What's new" feed.
     """
+    values = {
+        "actor_id": actor.id if actor else None,
+        "actor_employee_id": actor.employee_id if actor else actor_employee_id,
+        "actor_name": actor.name if actor else None,
+        "actor_role": actor.role if actor else None,
+        "action": action,
+        "entity_type": entity_type,
+        "entity_id": entity_id,
+        "project_id": project_id,
+        "summary": summary,
+        "changes": json.dumps(diff(before, after)),
+        "outcome": outcome,
+    }
+    # Only named when set, so earlier migrations that write audit entries
+    # still run before migration 8 adds the column.
+    if subject_user_id is not None:
+        values["subject_user_id"] = subject_user_id
     cur.execute(
-        """
-        INSERT INTO audit_log (actor_id, actor_employee_id, actor_name, actor_role, action,
-                               entity_type, entity_id, project_id, summary, changes, outcome)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s::jsonb, %s)
-        """,
-        (
-            actor.id if actor else None,
-            actor.employee_id if actor else actor_employee_id,
-            actor.name if actor else None,
-            actor.role if actor else None,
-            action,
-            entity_type,
-            entity_id,
-            project_id,
-            summary,
-            json.dumps(diff(before, after)),
-            outcome,
+        sql.SQL("INSERT INTO audit_log ({}) VALUES ({})").format(
+            sql.SQL(", ").join(map(sql.Identifier, values)),
+            sql.SQL(", ").join(sql.SQL("%s::jsonb" if key == "changes" else "%s") for key in values),
         ),
+        list(values.values()),
     )
 
 

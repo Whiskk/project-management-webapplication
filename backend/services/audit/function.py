@@ -10,6 +10,7 @@ Routes (under /api/audit):
     GET /           filtered, paginated entries, newest first
                     ?q= &actor= (employee id) &role= &action= &entity_type= &outcome=
                     &project_id= &from= (YYYY-MM-DD) &to= (YYYY-MM-DD) &page= &page_size=
+    GET /export     the same filters, as a CSV download (newest first, at most 5,000 rows)
     GET /actions    distinct action names, for filter menus
 
 There are deliberately no write routes: entries are only created by the other
@@ -17,7 +18,10 @@ services, inside the same transaction as the change they describe, and the
 database rejects any UPDATE, DELETE or TRUNCATE on the table.
 """
 
-from datetime import date, timedelta
+import csv
+import io
+import json
+from datetime import UTC, date, datetime, timedelta
 from typing import Any
 
 from psycopg import sql
@@ -25,12 +29,27 @@ from psycopg import sql
 from pm_core.auth import ROLES, require_auth
 from pm_core.db import transaction
 from pm_core.errors import ValidationError
-from pm_core.http import Request, Response, Router, ok
+from pm_core.http import Request, Response, Router, ok, text
 from pm_core.validation import parse_choice, parse_id, parse_pagination
 
 router = Router("audit")
 
 OUTCOMES = ("success", "denied")
+# Keeps an export well inside the 6 MB Lambda response limit; narrow the filters for more.
+EXPORT_LIMIT = 5000
+EXPORT_COLUMNS = (
+    ("occurred_at", "Time (UTC)"),
+    ("actor_employee_id", "Employee ID"),
+    ("actor_name", "Name"),
+    ("actor_role", "Role"),
+    ("action", "Action"),
+    ("outcome", "Outcome"),
+    ("entity_type", "Record type"),
+    ("entity_id", "Record ID"),
+    ("project_name", "Project"),
+    ("summary", "Summary"),
+    ("changes", "Changes"),
+)
 
 # What a manager may see: their own entries, their direct reports' (employees
 # only, so a report later promoted to manager drops out), and failed sign-ins
@@ -83,12 +102,9 @@ def serialize(row: dict) -> dict:
     return {key: row[key] for key in keys}
 
 
-@router.get("/")
-@require_auth("admin", "manager")
-def list_entries(request: Request) -> Response:
-    """Search the audit log, limited to what the signed-in user may see."""
+def _filters(request: Request) -> tuple[sql.Composable, list[Any]]:
+    """The WHERE clause and parameters for the query string, within what the user may see."""
     query = request.query
-    limit, offset = parse_pagination(query, default_size=50, max_size=200)
     role = parse_choice(query, "role", ROLES)
     outcome = parse_choice(query, "outcome", OUTCOMES)
     start, end = _parse_date(query, "from"), _parse_date(query, "to")
@@ -122,17 +138,60 @@ def list_entries(request: Request) -> Response:
         add("(l.summary ILIKE %s OR l.actor_name ILIKE %s OR l.actor_employee_id ILIKE %s)", term, term, term)
 
     where = sql.SQL(" WHERE ") + sql.SQL(" AND ").join(conditions) if conditions else sql.SQL("")
+    return where, params
+
+
+_SELECT_ENTRIES = sql.SQL(
+    "SELECT l.*, p.name AS project_name FROM audit_log l LEFT JOIN projects p ON p.id = l.project_id"
+)
+_NEWEST_FIRST = sql.SQL(" ORDER BY l.occurred_at DESC, l.id DESC LIMIT %s OFFSET %s")
+
+
+@router.get("/")
+@require_auth("admin", "manager")
+def list_entries(request: Request) -> Response:
+    """Search the audit log, limited to what the signed-in user may see."""
+    limit, offset = parse_pagination(request.query, default_size=50, max_size=200)
+    where, params = _filters(request)
     with transaction() as cur:
         cur.execute(sql.SQL("SELECT COUNT(*) AS n FROM audit_log l") + where, params)
         total = cur.fetchone()["n"]
-        cur.execute(
-            sql.SQL("SELECT l.*, p.name AS project_name FROM audit_log l LEFT JOIN projects p ON p.id = l.project_id")
-            + where
-            + sql.SQL(" ORDER BY l.occurred_at DESC, l.id DESC LIMIT %s OFFSET %s"),
-            [*params, limit, offset],
-        )
+        cur.execute(_SELECT_ENTRIES + where + _NEWEST_FIRST, [*params, limit, offset])
         rows = cur.fetchall()
     return ok({"items": [serialize(r) for r in rows], "total": total})
+
+
+def _csv_cell(value: Any) -> str:
+    """
+    One CSV cell. Text starting with = + - @ (or a tab/CR) is prefixed with an
+    apostrophe so a spreadsheet shows it rather than running it as a formula -
+    project names and summaries contain text users typed.
+    """
+    if value is None:
+        return ""
+    if isinstance(value, datetime):
+        return value.astimezone(UTC).strftime("%Y-%m-%d %H:%M:%S")
+    if isinstance(value, dict):
+        value = json.dumps(value) if value else ""
+    value = str(value)
+    return "'" + value if value[:1] in ("=", "+", "-", "@", "\t", "\r") else value
+
+
+@router.get("/export")
+@require_auth("admin", "manager")
+def export_entries(request: Request) -> Response:
+    """The filtered audit log as a CSV file, newest first."""
+    where, params = _filters(request)
+    with transaction() as cur:
+        cur.execute(_SELECT_ENTRIES + where + _NEWEST_FIRST, [*params, EXPORT_LIMIT, 0])
+        rows = cur.fetchall()
+    out = io.StringIO()
+    writer = csv.writer(out)
+    writer.writerow([label for _, label in EXPORT_COLUMNS])
+    for row in rows:
+        writer.writerow([_csv_cell(row[key]) for key, _ in EXPORT_COLUMNS])
+    filename = f"audit-log-{datetime.now(UTC):%Y-%m-%d}.csv"
+    return text(out.getvalue(), "text/csv; charset=utf-8", filename)
 
 
 @router.get("/actions")

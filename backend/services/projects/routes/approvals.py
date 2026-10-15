@@ -143,6 +143,7 @@ def register(router: Router) -> None:
                 },
                 after={"status": "approved", "hours_per_week": approved, "pending_hours": None},
                 project_id=project["id"],
+                subject_user_id=employee["id"],
             )
             row = load_assignment_view(cur, assignment["id"])
         return ok(serialize(row, project, actor.role))
@@ -189,5 +190,6 @@ def register(router: Router) -> None:
                     "pending_hours": assignment["pending_hours"],
                 },
                 project_id=project["id"],
+                subject_user_id=employee["id"],
             )
         return ok({"assignment": serialize(result, project, actor.role) if result else None, "removed": result is None})

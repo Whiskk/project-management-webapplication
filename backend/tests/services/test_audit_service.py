@@ -1,5 +1,9 @@
 """Integration tests for the read-only audit service."""
 
+import csv
+import io
+import json
+
 import pytest
 
 from conftest import bearer, load_service, make_event, response_json
@@ -244,3 +248,42 @@ def test_actions_menu(entries: None) -> None:
 @pytest.mark.parametrize("method", ["POST", "PATCH", "PUT", "DELETE"])
 def test_there_are_no_write_routes(entries: None, method: str) -> None:
     assert call("/", method=method)[0] == 405
+
+
+# ------------------------------------------------------------------ CSV export
+
+
+def export(as_: str = "AA7K2P", query: dict | None = None) -> tuple[dict, list[list[str]]]:
+    response = service.handler(make_event("GET", "/api/audit/export", headers=bearer(as_), query=query))
+    rows = list(csv.reader(io.StringIO(response.get("body", ""))))
+    return response, rows
+
+
+def test_export_is_a_csv_download_of_the_filtered_entries(entries: None) -> None:
+    response, rows = export(query={"project_id": "1"})
+    assert response["statusCode"] == 200
+    assert response["headers"]["Content-Type"] == "text/csv; charset=utf-8"
+    assert response["headers"]["Content-Disposition"].startswith('attachment; filename="audit-log-')
+    header, *data = rows
+    assert header[:3] == ["Time (UTC)", "Employee ID", "Name"]
+    summary = header.index("Summary")
+    assert [row[summary] for row in data] == ["Added milestone 'Design' to Apollo", "Created project Apollo"]
+    assert data[1][header.index("Project")] == "Apollo"
+    assert json.loads(data[1][header.index("Changes")]) == {"name": {"from": None, "to": "Apollo"}}
+
+
+def test_export_keeps_the_manager_scope(team_entries: None) -> None:
+    _, (header, *data) = export("MM4R8T")
+    assert [row[header.index("Summary")] for row in data] == MORGAN_SEES
+
+
+def test_export_refuses_employees_and_bad_filters(entries: None) -> None:
+    assert export("EE3H9W")[0]["statusCode"] == 403
+    assert export(query={"from": "2026-11-02", "to": "2026-11-01"})[0]["statusCode"] == 400
+
+
+def test_export_neutralises_spreadsheet_formulas(fresh_db: None) -> None:
+    with db.transaction() as cur:
+        audit.record(cur, ADMIN, "project.create", "project", 1, '=HYPERLINK("http://evil","click")')
+    _, (header, row) = export()
+    assert row[header.index("Summary")] == '\'=HYPERLINK("http://evil","click")'

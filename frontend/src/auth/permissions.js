@@ -15,6 +15,7 @@ const PERMISSIONS = {
   'approvals.review': ['manager'],
   // Managers see only their own and their direct reports' entries (scoped by the API).
   'audit.view': ['admin', 'manager'],
+  'availability.view': ['admin', 'manager'],
   'users.view': ['admin', 'manager'],
   'users.manage': ['admin'],
   'projects.create': ['admin'],

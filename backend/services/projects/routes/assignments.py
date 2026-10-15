@@ -263,6 +263,7 @@ def register(router: Router) -> None:
                 summary,
                 after={"user": user["employee_id"], "hours_per_week": hours, "status": row["status"]},
                 project_id=project["id"],
+                subject_user_id=user["id"],
             )
         return created(serialize(row, project, actor.role))
 
@@ -338,6 +339,7 @@ def register(router: Router) -> None:
                     before=before_state,
                     after=after_state,
                     project_id=project["id"],
+                    subject_user_id=user["id"],
                 )
             row = load_assignment_view(cur, assignment["id"])
         return ok(serialize(row, project, actor.role))
@@ -373,6 +375,7 @@ def register(router: Router) -> None:
                     "status": assignment["status"],
                 },
                 project_id=project["id"],
+                subject_user_id=user["id"],
             )
         return no_content()
 

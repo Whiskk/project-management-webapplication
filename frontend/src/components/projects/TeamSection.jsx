@@ -21,6 +21,7 @@ import PersonAddIcon from '@mui/icons-material/PersonAdd';
 import useApiResource from '../../hooks/useApiResource';
 import { projectsApi } from '../../services/projectsApi';
 import { formatCurrency, formatHours, fullName } from '../../utils/format';
+import InfoTip from '../common/InfoTip';
 import ConfirmDialog from '../common/ConfirmDialog';
 import { useNotify } from '../feedback/notificationContext';
 import AssignmentDialog from './AssignmentDialog';
@@ -82,6 +83,7 @@ export default function TeamSection({ project, canStaff, showCosts, onChanged })
             <Typography variant="h3" component="h2">Team</Typography>
             <Typography variant="body2" color="text.secondary">
               {formatHours(project.allocated_hours)} per week allocated · nobody can exceed 40 h per week
+              <InfoTip topic="weeklyHours" sx={{ ml: 0.5, mt: -0.25 }} />
             </Typography>
           </div>
           {canStaff && (

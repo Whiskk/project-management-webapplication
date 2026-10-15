@@ -55,13 +55,14 @@ function buildUrl(service, path, query) {
  *
  * @param {string} service - Service name, e.g. 'projects'.
  * @param {string} [path] - Path within the service, e.g. '/12/archive'.
- * @param {object} [options] - { method, body, query, signal }.
- * @returns {Promise<any>} Parsed JSON body, or null for 204 responses.
+ * @param {object} [options] - { method, body, query, signal, accept }. `accept` (e.g. 'text/csv')
+ *   asks for a file instead of JSON; the response is then returned as a Blob.
+ * @returns {Promise<any>} Parsed JSON body, a Blob when `accept` is given, or null for 204 responses.
  * @throws {ApiError}
  */
 export async function apiRequest(service, path = '', options = {}) {
-  const { method = 'GET', body, query, signal, retried = false } = options;
-  const headers = { Accept: 'application/json' };
+  const { method = 'GET', body, query, signal, accept, retried = false } = options;
+  const headers = { Accept: accept ? `${accept}, application/json` : 'application/json' };
   if (body !== undefined) headers['Content-Type'] = 'application/json';
   const token = authHandlers.getAccessToken();
   if (token) headers.Authorization = `Bearer ${token}`;
@@ -82,6 +83,7 @@ export async function apiRequest(service, path = '', options = {}) {
   if (response.status === 204) return null;
 
   const contentType = response.headers.get('content-type') || '';
+  if (accept && response.ok && contentType.includes(accept)) return response.blob();
   if (!contentType.includes('application/json')) {
     // CloudFront rewrites unknown paths to index.html with a 200, so a non-JSON
     // response means the API route was not found.
@@ -117,4 +119,18 @@ export const api = {
   put: (service, path, body, options) => apiRequest(service, path, { ...options, method: 'PUT', body }),
   patch: (service, path, body, options) => apiRequest(service, path, { ...options, method: 'PATCH', body }),
   delete: (service, path, options) => apiRequest(service, path, { ...options, method: 'DELETE' }),
+  /** GET a file (e.g. accept = 'text/csv') as a Blob; errors still arrive as ApiError. */
+  download: (service, path, accept, options) => apiRequest(service, path, { ...options, method: 'GET', accept }),
 };
+
+/** Save a Blob through the browser's download prompt. */
+export function saveBlob(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.append(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}

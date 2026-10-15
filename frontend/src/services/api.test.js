@@ -48,6 +48,20 @@ describe('apiRequest', () => {
     expect(error).toMatchObject({ status: 404, code: 'unexpected_response' });
   });
 
+  it('downloads files as a Blob, asking for the file type', async () => {
+    const blob = new Blob(['a,b']);
+    const fetchMock = mockFetchSequence({ ...jsonResponse(200, null, 'text/csv; charset=utf-8'), blob: async () => blob });
+    await expect(api.download('audit', '/export', 'text/csv', { query: { q: 'x' } })).resolves.toBe(blob);
+    expect(fetchMock.mock.calls[0][0]).toBe('/api/audit/export?q=x');
+    expect(fetchMock.mock.calls[0][1].headers.Accept).toBe('text/csv, application/json');
+  });
+
+  it('still reports JSON errors from a download', async () => {
+    mockFetchSequence(jsonResponse(403, { error: { code: 'forbidden', message: 'Nope' } }));
+    const error = await api.download('audit', '/export', 'text/csv').catch((e) => e);
+    expect(error).toMatchObject({ status: 403, code: 'forbidden' });
+  });
+
   it('reports network failures with a friendly message', async () => {
     vi.spyOn(globalThis, 'fetch').mockRejectedValue(new TypeError('Failed to fetch'));
     const error = await api.get('health').catch((e) => e);

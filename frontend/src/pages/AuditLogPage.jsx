@@ -12,13 +12,17 @@ import Stack from '@mui/material/Stack';
 import TablePagination from '@mui/material/TablePagination';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
+import DownloadIcon from '@mui/icons-material/Download';
 import SearchIcon from '@mui/icons-material/Search';
 import { useAuth } from '../auth/authContext';
 import { ROLE_LABELS } from '../auth/permissions';
 import AuditTable from '../components/audit/AuditTable';
+import { useNotify } from '../components/feedback/notificationContext';
 import useApiResource from '../hooks/useApiResource';
 import useDebouncedValue from '../hooks/useDebouncedValue';
-import { auditApi } from '../services/auditApi';
+import { saveBlob } from '../services/api';
+import { EXPORT_LIMIT, auditApi } from '../services/auditApi';
+import { todayIso } from '../utils/schedule';
 
 const EMPTY_FILTERS = { q: '', action: '', role: '', outcome: '', from: '', to: '' };
 
@@ -28,6 +32,7 @@ const EMPTY_FILTERS = { q: '', action: '', role: '', outcome: '', from: '', to: 
  */
 export default function AuditLogPage() {
   const { user } = useAuth();
+  const notify = useNotify();
   const isManager = user.role === 'manager';
   // A manager's log only ever contains managers (themselves) and employees.
   const roleOptions = Object.entries(ROLE_LABELS).filter(([value]) => !isManager || value !== 'admin');
@@ -54,6 +59,28 @@ export default function AuditLogPage() {
     setPage(0);
   };
   const filtered = projectId || Object.values(filters).some(Boolean);
+  const total = entries.data?.total ?? 0;
+  const [exporting, setExporting] = useState(false);
+
+  const exportCsv = async () => {
+    setExporting(true);
+    try {
+      const blob = await auditApi.exportCsv({ ...filters, q: search, project_id: projectId });
+      saveBlob(blob, `audit-log-${todayIso()}.csv`);
+      if (total > EXPORT_LIMIT) {
+        notify(
+          `Exported the newest ${EXPORT_LIMIT.toLocaleString('en-US')} of ${total.toLocaleString('en-US')} entries. Narrow the dates to export older ones.`,
+          'warning',
+        );
+      } else {
+        notify(`Exported ${total.toLocaleString('en-US')} ${total === 1 ? 'entry' : 'entries'}`, 'success');
+      }
+    } catch (error) {
+      notify(error.message, 'error');
+    } finally {
+      setExporting(false);
+    }
+  };
 
   return (
     <Stack spacing={3}>
@@ -126,6 +153,16 @@ export default function AuditLogPage() {
               Clear filters
             </Button>
           )}
+          <Button
+            size="small"
+            variant="outlined"
+            startIcon={<DownloadIcon />}
+            onClick={exportCsv}
+            disabled={exporting || entries.status !== 'success' || total === 0}
+            sx={{ ml: { md: 'auto' } }}
+          >
+            {exporting ? 'Exporting…' : `Export CSV${filtered ? ' (filtered)' : ''}`}
+          </Button>
         </Grid>
       </Grid>
 

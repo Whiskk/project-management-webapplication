@@ -23,6 +23,7 @@ export const projectsApi = {
   completeTask: (id, taskId) => api.post('projects', `/${id}/tasks/${taskId}/complete`),
   reopenTask: (id, taskId) => api.post('projects', `/${id}/tasks/${taskId}/reopen`),
   dashboard: (signal) => api.get('projects', '/dashboard', { signal }),
+  availability: (query, signal) => api.get('projects', '/availability', { query, signal }),
   requests: (query, signal) => api.get('projects', '/requests', { query, signal }),
   submitRequest: (data) => api.post('projects', '/requests', data),
   withdrawRequest: (requestId) => api.post('projects', `/requests/${requestId}/withdraw`),

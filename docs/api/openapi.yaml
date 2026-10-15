@@ -1169,6 +1169,28 @@ paths:
         "409": { $ref: "#/components/responses/Conflict" }
 
   # ------------------------------------------------------------------ dashboard
+  /api/projects/availability:
+    get:
+      tags: [Dashboard]
+      operationId: getTeamAvailability
+      summary: Booked hours per employee per week (admin, manager)
+      description: |
+        Every active employee's hours for each week (Monday to Friday), for planning who to staff. Each week is the
+        employee's busiest day across current projects, the same figure the 40-hour rule checks, split into
+        confirmed hours and hours awaiting approval (which are already reserved). Only totals are returned, never
+        project names. `is_my_report` marks the caller's direct reports.
+      parameters:
+        - { name: start, in: query, schema: { type: string, format: date }, description: "Any day in the first week (default today); moved back to its Monday." }
+        - { name: weeks, in: query, schema: { type: integer, minimum: 1, maximum: 26, default: 12 } }
+      responses:
+        "200":
+          description: The weeks and each employee's hours in them.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TeamAvailability" }
+        "400": { $ref: "#/components/responses/ValidationFailed" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
   /api/projects/dashboard:
     get:
       tags: [Dashboard]
@@ -1225,6 +1247,40 @@ paths:
                 properties:
                   items: { type: array, items: { $ref: "#/components/schemas/AuditEntry" } }
                   total: { type: integer }
+        "400": { $ref: "#/components/responses/ValidationFailed" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+  /api/audit/export:
+    get:
+      tags: [Audit]
+      operationId: exportAuditEntries
+      summary: Download the audit log as CSV
+      description: |
+        The same filters and visibility as the search, as a CSV file, newest first. At most 5,000 rows; narrow the
+        filters (for example by date) to export more. Times are UTC. Cells starting with `=`, `+`, `-` or `@` get a
+        leading apostrophe so spreadsheets show them as text instead of running them as formulas.
+      parameters:
+        - { name: q, in: query, schema: { type: string }, description: "Matches the summary, actor name or actor employee ID." }
+        - { name: actor, in: query, schema: { type: string }, description: Actor's employee ID (case-insensitive). }
+        - { name: role, in: query, schema: { $ref: "#/components/schemas/Role" }, description: Actor's role at the time. }
+        - { name: action, in: query, schema: { type: string, example: task.complete } }
+        - { name: entity_type, in: query, schema: { type: string, example: project } }
+        - { name: outcome, in: query, schema: { type: string, enum: [success, denied] } }
+        - { name: project_id, in: query, schema: { type: integer, minimum: 1 } }
+        - { name: from, in: query, schema: { type: string, format: date }, description: On or after this day. }
+        - { name: to, in: query, schema: { type: string, format: date }, description: On or before this day. }
+      responses:
+        "200":
+          description: "A CSV attachment (`audit-log-<date>.csv`) with a header row."
+          headers:
+            Content-Disposition:
+              schema: { type: string, example: 'attachment; filename="audit-log-2026-10-15.csv"' }
+          content:
+            text/csv:
+              schema: { type: string }
+              example: |
+                Time (UTC),Employee ID,Name,Role,Action,Outcome,Record type,Record ID,Project,Summary,Changes
+                2026-10-15 13:02:11,MM4R8T,Morgan Manager,manager,task.create,success,task,12,Apollo,Added task 'Wireframes',"{""title"": {""from"": null, ""to"": ""Wireframes""}}"
         "400": { $ref: "#/components/responses/ValidationFailed" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
@@ -1958,7 +2014,7 @@ components:
               available: { type: number }
     EmployeeDashboard:
       type: object
-      required: [role, stats, projects, schedule, upcoming_milestones, my_tasks]
+      required: [role, stats, projects, schedule, upcoming_milestones, my_tasks, whats_new]
       properties:
         role: { type: string, enum: [employee] }
         stats:
@@ -2022,6 +2078,29 @@ components:
               project_id: { type: integer }
               project_name: { type: string }
               waiting: { type: boolean, description: The milestone still waits on incomplete dependencies. }
+        whats_new:
+          type: object
+          description: |
+            Up to 10 changes from the last 14 days that affect me, made by someone else, newest first: my hours and
+            tasks, and new dates, status and milestones on projects I'm on. Worded for me; never budgets or costs.
+          required: [since, window_days, new_count, items]
+          properties:
+            since: { type: string, format: date-time, nullable: true, description: "My previous sign-in (null on the first)." }
+            window_days: { type: integer, example: 14 }
+            new_count: { type: integer, description: Items since my previous sign-in. }
+            items:
+              type: array
+              items:
+                type: object
+                required: [id, occurred_at, kind, text, project_id, project_name, is_new]
+                properties:
+                  id: { type: integer, description: The audit entry. }
+                  occurred_at: { type: string, format: date-time }
+                  kind: { type: string, enum: [assignment, task, project, milestone] }
+                  text: { type: string, example: "Morgan Manager changed your hours on Apollo from 10 h/week to 12 h/week" }
+                  project_id: { type: integer, nullable: true }
+                  project_name: { type: string, nullable: true }
+                  is_new: { type: boolean }
 
     # ---------------------------------------------------------------- audit and monitor
     AuditEntry:
@@ -2064,6 +2143,43 @@ components:
               from: {}
               to: {}
         outcome: { type: string, enum: [success, denied] }
+    TeamAvailability:
+      type: object
+      required: [weeks, capacity, people]
+      properties:
+        weeks:
+          type: array
+          items:
+            type: object
+            required: [start, end]
+            properties:
+              start: { type: string, format: date, description: Monday. }
+              end: { type: string, format: date, description: Friday. }
+        capacity: { type: number, example: 40, description: Most hours anyone can be booked for in a week. }
+        people:
+          type: array
+          items:
+            type: object
+            required: [user_id, employee_id, first_name, last_name, job_title, manager_name, is_my_report, weeks]
+            properties:
+              user_id: { type: integer }
+              employee_id: { type: string, example: EE3H9W }
+              first_name: { type: string }
+              last_name: { type: string }
+              job_title: { type: string, nullable: true }
+              manager_name: { type: string, nullable: true }
+              is_my_report: { type: boolean }
+              weeks:
+                type: array
+                description: One entry per week, in the same order as `weeks`.
+                items:
+                  type: object
+                  required: [booked, confirmed, pending, free]
+                  properties:
+                    booked: { type: number, example: 25, description: Confirmed plus awaiting approval. }
+                    confirmed: { type: number, example: 10 }
+                    pending: { type: number, example: 15, description: Awaiting approval (already reserved). }
+                    free: { type: number, example: 15, description: "40 minus booked, never below 0." }
     BudgetCheckResult:
       type: object
       required: [checked, newly_over_budget, back_within_budget, still_over_budget, ran_at]

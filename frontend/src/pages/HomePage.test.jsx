@@ -91,6 +91,21 @@ describe('HomePage dashboards', () => {
     expect(within(milestones).getByText('Overdue')).toBeInTheDocument();
   });
 
+  it('shows employees what changed for them', async () => {
+    renderAs('employee', {
+      role: 'employee',
+      stats: { hours_this_week: 0, hours_awaiting_approval: 0, capacity: 40, my_projects: 0 },
+      projects: [],
+      upcoming_milestones: [],
+      whats_new: {
+        since: null, window_days: 14, new_count: 1,
+        items: [{ id: 1, occurred_at: '2026-10-14T09:00:00Z', kind: 'assignment', text: 'Morgan Manager added you to Apollo for 10 h/week', project_id: 7, project_name: 'Apollo', is_new: true }],
+      },
+    });
+    const list = await screen.findByRole('list', { name: "What's new" });
+    expect(within(list).getByText('Morgan Manager added you to Apollo for 10 h/week')).toBeInTheDocument();
+  });
+
   it('shows a retryable error if the dashboard fails to load', async () => {
     const dashboard = vi.spyOn(projectsApi, 'dashboard')
       .mockRejectedValueOnce(new ApiError(0, 'network_error', 'Unable to reach the server.'))

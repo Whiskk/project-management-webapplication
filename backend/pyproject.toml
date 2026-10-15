@@ -29,4 +29,4 @@ select = [
 [tool.ruff.lint.isort]
 # Service-local modules (imported by bare name inside each Lambda package).
 # Service-local modules are imported by bare name inside each Lambda package.
-known-first-party = ["pm_core", "queries", "staffing", "routes", "conftest"]
+known-first-party = ["pm_core", "queries", "staffing", "whats_new", "routes", "conftest"]

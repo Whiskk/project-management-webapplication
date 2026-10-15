@@ -24,17 +24,19 @@ import InsightList from '../components/projects/InsightList';
 import ProjectFormDialog from '../components/projects/ProjectFormDialog';
 import ProjectStatusChip from '../components/projects/ProjectStatusChip';
 import ReactivateProjectDialog from '../components/projects/ReactivateProjectDialog';
+import InfoTip from '../components/common/InfoTip';
 import MilestonesSection from '../components/projects/MilestonesSection';
 import TeamSection from '../components/projects/TeamSection';
 import useApiResource from '../hooks/useApiResource';
 import { projectsApi } from '../services/projectsApi';
 import { formatCurrency, formatDailyHours, formatDate, formatHours } from '../utils/format';
 
-function Stat({ label, value, hint }) {
+function Stat({ label, value, hint, info }) {
   return (
     <Card sx={{ height: '100%' }}>
       <CardContent>
         <Typography variant="caption" color="text.secondary">{label}</Typography>
+        {info && <InfoTip topic={info} sx={{ ml: 0.5, mt: -0.5 }} />}
         <Typography variant="h3" component="p">{value}</Typography>
         {hint && <Typography variant="body2" color="text.secondary">{hint}</Typography>}
       </CardContent>
@@ -51,7 +53,10 @@ function BudgetStat({ project }) {
     <Card sx={{ height: '100%' }}>
       <CardContent>
         <Stack direction="row" justifyContent="space-between" alignItems="center">
-          <Typography variant="caption" color="text.secondary">Budget</Typography>
+          <Typography variant="caption" color="text.secondary">
+            Budget
+            <InfoTip topic="budget" sx={{ ml: 0.5, mt: -0.5 }} />
+          </Typography>
           {project.over_budget && <Chip size="small" color="error" label="Over budget" />}
         </Stack>
         <Typography variant="h3" component="p">{formatCurrency(budget)}</Typography>
@@ -170,7 +175,7 @@ export default function ProjectDetailPage() {
           <Stat label="Working days" value={data.working_days} hint="Monday to Friday" />
         </Grid>
         <Grid size={{ xs: 6, md: 3 }}>
-          <Stat label="Capacity per person" value={`${data.capacity_hours} h`} hint="8 hours per working day" />
+          <Stat label="Capacity per person" value={`${data.capacity_hours} h`} hint="8 hours per working day" info="capacity" />
         </Grid>
         <Grid size={{ xs: 12, sm: 6, md: 3 }}>
           {showMoney
@@ -178,6 +183,7 @@ export default function ProjectDetailPage() {
             : (
               <Stat
                 label="Your hours"
+                info="weeklyHours"
                 value={formatHours(data.my_hours_per_week ?? 0)}
                 hint={data.my_pending_hours !== null
                   ? `per week · ${formatHours(data.my_pending_hours)} awaiting your manager's approval`

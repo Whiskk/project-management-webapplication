@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { Route, Routes } from 'react-router';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError } from '../services/api';
+import * as apiModule from '../services/api';
 import { auditApi } from '../services/auditApi';
 import { TEST_USERS, fakeAuth, renderWithProviders } from '../test/render';
 import AuditLogPage from './AuditLogPage';
@@ -94,6 +95,28 @@ describe('AuditLogPage', () => {
     await waitFor(() => expect(auditApi.list).toHaveBeenLastCalledWith(
       expect.objectContaining({ project_id: '' }), expect.anything(),
     ));
+  });
+
+  it('exports the filtered log as a CSV file', async () => {
+    const blob = new Blob(['csv']);
+    vi.spyOn(auditApi, 'exportCsv').mockResolvedValue(blob);
+    const save = vi.spyOn(apiModule, 'saveBlob').mockImplementation(() => {});
+    renderPage('/audit?project_id=7');
+    await screen.findByText('Updated project Apollo: budget');
+    await userEvent.click(screen.getByRole('button', { name: 'Export CSV (filtered)' }));
+    expect(auditApi.exportCsv).toHaveBeenCalledWith(expect.objectContaining({ project_id: '7' }));
+    expect(save).toHaveBeenCalledWith(blob, expect.stringMatching(/^audit-log-\d{4}-\d{2}-\d{2}\.csv$/));
+    expect(await screen.findByText('Exported 2 entries')).toBeInTheDocument();
+  });
+
+  it('warns when the export is capped', async () => {
+    auditApi.list.mockResolvedValue({ items: ENTRIES, total: 6200 });
+    vi.spyOn(auditApi, 'exportCsv').mockResolvedValue(new Blob(['csv']));
+    vi.spyOn(apiModule, 'saveBlob').mockImplementation(() => {});
+    renderPage();
+    await screen.findByText('Updated project Apollo: budget');
+    await userEvent.click(screen.getByRole('button', { name: 'Export CSV' }));
+    expect(await screen.findByText(/Exported the newest 5,000 of 6,200 entries/)).toBeInTheDocument();
   });
 
   it('shows a retryable error', async () => {

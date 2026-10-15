@@ -83,10 +83,12 @@ class Response:
     headers: dict[str, str] = field(default_factory=dict)
 
     def to_lambda(self) -> dict:
-        """Convert to the Lambda Function URL response format."""
+        """Convert to the Lambda Function URL response format (text bodies are sent as they are)."""
         headers = {"Content-Type": "application/json", **self.headers}
         result: dict[str, Any] = {"statusCode": self.status, "headers": headers}
-        if self.body is not None:
+        if isinstance(self.body, str):
+            result["body"] = self.body
+        elif self.body is not None:
             result["body"] = to_json(self.body)
         return result
 
@@ -94,6 +96,14 @@ class Response:
 def ok(body: Any, status: int = 200) -> Response:
     """200 OK (or a custom success status) with a JSON body."""
     return Response(status=status, body=body)
+
+
+def text(body: str, content_type: str, filename: str | None = None) -> Response:
+    """200 OK with a non-JSON body, e.g. a CSV download (``filename`` makes it an attachment)."""
+    headers = {"Content-Type": content_type}
+    if filename:
+        headers["Content-Disposition"] = f'attachment; filename="{filename}"'
+    return Response(body=body, headers=headers)
 
 
 def created(body: Any) -> Response:

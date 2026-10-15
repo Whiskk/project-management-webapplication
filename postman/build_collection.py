@@ -738,6 +738,41 @@ staffing = folder(
             ),
         ),
         request(
+            "Team availability shows the booked hours",
+            "GET",
+            "/api/projects/availability?start={{startDate}}&weeks=2",
+            "manager",
+            tests=(
+                status(200),
+                check(
+                    "Two weeks from the project's first Monday; the employee is booked and is the manager's report",
+                    "pm.expect(body.weeks).to.have.lengthOf(2);",
+                    'const eli = body.people.find((p) => String(p.user_id) === pm.collectionVariables.get("employeeUserId"));',
+                    "pm.expect(eli.is_my_report).to.eql(true);",
+                    "pm.expect(eli.weeks[1].confirmed).to.be.at.least(4);",
+                    "pm.expect(eli.weeks[1].free).to.eql(40 - eli.weeks[1].booked);",
+                ),
+                check(
+                    "Only totals: no project names",
+                    'pm.expect(pm.response.text()).to.not.include(pm.collectionVariables.get("runId"));',
+                ),
+            ),
+        ),
+        request(
+            "Employees can't see team availability",
+            "GET",
+            "/api/projects/availability",
+            "employee",
+            tests=(status(403),),
+        ),
+        request(
+            "Availability covers 1 to 26 weeks",
+            "GET",
+            "/api/projects/availability?weeks=27",
+            "manager",
+            tests=(status(400), detail("weeks", "between 1 and 26")),
+        ),
+        request(
             "The same person can't be added twice",
             "POST",
             PROJECT_PATH + "/assignments",
@@ -1005,6 +1040,13 @@ milestones = folder(
                     'const entry = body.schedule.find((p) => String(p.project_id) === pm.collectionVariables.get("projectId"));',
                     "pm.expect(entry.hours_per_week).to.eql(4);",
                     "pm.expect(entry.milestones.map((m) => m.title)).to.eql(['Design', 'Build']);",
+                ),
+                check(
+                    "What's new says they were added to the project, without money",
+                    'const mine = body.whats_new.items.filter((i) => String(i.project_id) === pm.collectionVariables.get("projectId"));',
+                    "pm.expect(mine.map((i) => i.text).join(' | ')).to.include('added you to');",
+                    "pm.expect(mine.map((i) => i.kind)).to.include('task');",
+                    "pm.expect(body.whats_new.items.some((i) => i.text.includes('$'))).to.eql(false);",
                 ),
             ),
         ),
@@ -1286,6 +1328,31 @@ audit = folder(
             tests=(status(403),),
         ),
         request(
+            "Admins export the project's history as CSV",
+            "GET",
+            "/api/audit/export?project_id={{projectId}}",
+            "admin",
+            tests=(
+                status(200),
+                'pm.test("Is a CSV download", () => {\n'
+                '    pm.expect(pm.response.headers.get("Content-Type")).to.include("text/csv");\n'
+                '    pm.expect(pm.response.headers.get("Content-Disposition")).to.include("attachment");\n'
+                "});",
+                'pm.test("Has a header row and the project\'s entries", () => {\n'
+                "    const text = pm.response.text();\n"
+                '    pm.expect(text.startsWith("Time (UTC),Employee ID,Name,Role,Action")).to.eql(true);\n'
+                '    pm.expect(text).to.include("assignment.create");\n'
+                "});",
+            ),
+        ),
+        request(
+            "Employees can't export the audit log",
+            "GET",
+            "/api/audit/export",
+            "employee",
+            tests=(status(403),),
+        ),
+        request(
             "Action names for the filter menu",
             "GET",
             "/api/audit/actions",
@@ -1390,7 +1457,9 @@ cleanup = folder(
 )
 
 # Runs after every request.
-COLLECTION_TESTS = """if (pm.response.code !== 204) {
+COLLECTION_TESTS = """// File downloads (the audit CSV export) are checked by their own request.
+const isDownload = pm.request.url.getPath().endsWith("/export") && pm.response.code === 200;
+if (pm.response.code !== 204 && !isDownload) {
     pm.test("Responds with JSON", () => pm.expect(pm.response.headers.get("Content-Type")).to.include("application/json"));
 }
 if (pm.response.code >= 400) {

@@ -9,6 +9,7 @@ Layout:
         approvals    cross-team hours approval      } registered first: /approvals,
         requests     project requests               } /requests and /dashboard
         dashboard    role dashboards                } must not match /{id}
+        availability team availability by week      }
         projects     project CRUD, archive / reactivate
         assignments  staffing with the 40-hour and budget rules
         milestones   milestones with dependencies and tracking
@@ -16,10 +17,10 @@ Layout:
 """
 
 from pm_core.http import Router
-from routes import approvals, assignments, dashboard, milestones, projects, requests, tasks
+from routes import approvals, assignments, availability, dashboard, milestones, projects, requests, tasks
 
 router = Router("projects")
-for module in (approvals, requests, dashboard, projects, assignments, milestones, tasks):
+for module in (approvals, requests, dashboard, availability, projects, assignments, milestones, tasks):
     module.register(router)
 
 

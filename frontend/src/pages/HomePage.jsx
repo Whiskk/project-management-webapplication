@@ -15,11 +15,13 @@ import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import { useAuth } from '../auth/authContext';
 import { ROLE_LABELS } from '../auth/permissions';
+import InfoTip from '../components/common/InfoTip';
 import BudgetCheckButton from '../components/dashboard/BudgetCheckButton';
 import MySchedule from '../components/dashboard/MySchedule';
 import MyTasks from '../components/dashboard/MyTasks';
 import { AttentionList, CapacityBar, StatTile } from '../components/dashboard/DashboardWidgets';
 import SystemStatus from '../components/dashboard/SystemStatus';
+import WhatsNew from '../components/dashboard/WhatsNew';
 import useApiResource from '../hooks/useApiResource';
 import { projectsApi } from '../services/projectsApi';
 import { formatCurrency, formatDailyHours, formatDate, formatHours, fullName } from '../utils/format';
@@ -43,7 +45,10 @@ function AdminDashboard({ data, onRefresh }) {
       <Grid size={{ xs: 12, md: 6 }}>
         <Card sx={{ height: '100%' }}>
           <CardContent>
-            <Typography variant="h3" component="h2" gutterBottom>Budget committed</Typography>
+            <Stack direction="row" alignItems="center" spacing={0.5} sx={{ mb: 1 }}>
+              <Typography variant="h3" component="h2">Budget committed</Typography>
+              <InfoTip topic="committed" />
+            </Stack>
             <Typography variant="h2" component="p">{formatCurrency(committed)} <Typography component="span" color="text.secondary">of {formatCurrency(budget)}</Typography></Typography>
             <CapacityBar used={committed} capacity={budget || 1} label="Budget committed across active projects" />
             <Typography variant="body2" color="text.secondary" sx={{ mt: 1, mb: 2 }}>
@@ -124,10 +129,18 @@ function EmployeeDashboard({ data, onRefresh }) {
   const { stats } = data;
   return (
     <Grid container spacing={2}>
+      {data.whats_new && (
+        <Grid size={12}>
+          <WhatsNew data={data.whats_new} />
+        </Grid>
+      )}
       <Grid size={{ xs: 12, md: 5 }}>
         <Card sx={{ height: '100%' }}>
           <CardContent>
-            <Typography variant="h3" component="h2" gutterBottom>My week</Typography>
+            <Stack direction="row" alignItems="center" spacing={0.5} sx={{ mb: 1 }}>
+              <Typography variant="h3" component="h2">My week</Typography>
+              <InfoTip topic="myWeek" />
+            </Stack>
             <Typography variant="h2" component="p">
               {formatHours(stats.hours_this_week)} <Typography component="span" color="text.secondary">of {formatHours(stats.capacity)}</Typography>
             </Typography>

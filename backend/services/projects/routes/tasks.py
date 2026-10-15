@@ -213,6 +213,7 @@ def register(router: Router) -> None:
                 f"Added task '{row['title']}' to milestone '{milestone['title']}' on {project['name']}{assigned}",
                 after=_audit_view(row),
                 project_id=project["id"],
+                subject_user_id=row["assignee_id"],
             )
         return created(serialize(row, actor, project, milestone["blocked_by"]))
 
@@ -248,6 +249,7 @@ def register(router: Router) -> None:
                     before=_audit_view(before),
                     after=_audit_view(row),
                     project_id=project["id"],
+                    subject_user_id=row["assignee_id"] or before["assignee_id"],
                 )
         return ok(serialize(row, actor, project, milestone["blocked_by"]))
 
@@ -270,6 +272,7 @@ def register(router: Router) -> None:
                 f"Deleted task '{row['title']}' from {project['name']}",
                 before=_audit_view(row),
                 project_id=project["id"],
+                subject_user_id=row["assignee_id"],
             )
         return no_content()
 
@@ -300,6 +303,7 @@ def register(router: Router) -> None:
                     before=_audit_view(task),
                     after={**_audit_view(task), "done": True},
                     project_id=project["id"],
+                    subject_user_id=task["assignee_id"],
                 )
             row = _load_task(cur, project["id"], task["id"])
         return ok(serialize(row, actor, project, milestone["blocked_by"]))
@@ -328,6 +332,7 @@ def register(router: Router) -> None:
                     before=_audit_view(task),
                     after={**_audit_view(task), "done": False},
                     project_id=project["id"],
+                    subject_user_id=task["assignee_id"],
                 )
             row = _load_task(cur, project["id"], task["id"])
         return ok(serialize(row, actor, project, milestone["blocked_by"]))

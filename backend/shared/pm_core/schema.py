@@ -278,6 +278,17 @@ MIGRATIONS: list[tuple[int, str | Callable[[psycopg.Cursor], None]]] = [
         CREATE INDEX tasks_open_assignee_idx ON tasks (assignee_id) WHERE completed_at IS NULL;
         """,
     ),
+    (
+        8,
+        # The employee an entry is about (whose hours or task changed), so an
+        # employee's dashboard can say what changed for them. Older entries
+        # have none: the log is append-only, so they are not back-filled.
+        """
+        ALTER TABLE audit_log ADD COLUMN subject_user_id BIGINT REFERENCES users (id);
+        CREATE INDEX audit_log_subject_idx ON audit_log (subject_user_id, occurred_at DESC)
+            WHERE subject_user_id IS NOT NULL;
+        """,
+    ),
 ]
 
 # Demo accounts created on an empty database.

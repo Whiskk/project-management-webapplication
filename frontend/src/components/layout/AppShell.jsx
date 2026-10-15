@@ -17,6 +17,7 @@ import Typography from '@mui/material/Typography';
 import AccountCircleIcon from '@mui/icons-material/AccountCircle';
 import AssignmentTurnedInIcon from '@mui/icons-material/AssignmentTurnedIn';
 import DashboardIcon from '@mui/icons-material/Dashboard';
+import EventAvailableIcon from '@mui/icons-material/EventAvailable';
 import FolderIcon from '@mui/icons-material/Folder';
 import HistoryIcon from '@mui/icons-material/History';
 import InboxIcon from '@mui/icons-material/Inbox';
@@ -35,6 +36,7 @@ const DRAWER_WIDTH = 240;
 const NAV_ITEMS = [
   { to: '/', label: 'Dashboard', icon: <DashboardIcon /> },
   { to: '/projects', label: 'Projects', icon: <FolderIcon /> },
+  { to: '/availability', label: 'Availability', icon: <EventAvailableIcon />, permission: 'availability.view' },
   { to: '/approvals', label: 'Approvals', icon: <AssignmentTurnedInIcon />, permission: 'approvals.review', badge: 'approvals' },
   { to: '/requests', label: 'Requests', icon: <InboxIcon />, permission: 'requests.view', badge: 'requests' },
   { to: '/users', label: 'Users', icon: <PeopleIcon />, permission: 'users.view' },

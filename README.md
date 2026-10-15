@@ -29,11 +29,11 @@ Built for the Citi Coding Workshop (Full Stack track) on the required stack: **R
 
 | Role | Can do |
 |---|---|
-| **Admin** | Create every account. **Employee IDs are generated from the person's initials plus 4 random characters** (e.g. Eli Employee → `EE3H9W`; letters and digits without look-alikes like 0/O and 1/I/L) and never change, even if the person is renamed; the 6-character password is generated and shown once, and **the person must choose their own password the first time they sign in** (the same applies after an admin resets a password). Create, edit, archive and reactivate projects and assign their manager. Approve or reject managers' project requests (approving creates the project, optionally with adjusted budget/dates/manager). See the organisation dashboard, the full **Audit log**, and each project's history. Run the budget check. |
-| **Manager** | See and run the projects they manage: schedule, budget, status, **milestones with dependencies**, **tasks** inside each milestone assigned to team members, and **staffing** (hours per week). Staff any employee; staffing someone else's report sends the hours to that employee's manager for **approval**. Approve or reject hours requested for their own reports. Request new projects. Edit their direct reports' basic details. See a **scoped Audit log**: their own activity and their direct reports' (never other managers' or admins'). Dashboard with their team's load this week. |
-| **Employee** | See the projects they're assigned to, their hours (and hours awaiting approval), the team and milestones - never budgets or costs. **Tick off tasks assigned to them** (from the project or their dashboard). Update their own name and email. Dashboard showing their week against 40 hours (also as time per working day: 16 h/week is about 3 h 12 min a day), a **12-week schedule** (a bar per project, milestone markers, a today line and their hours each week), their open tasks and upcoming milestones. |
+| **Admin** | Create every account. **Employee IDs are generated from the person's initials plus 4 random characters** (e.g. Eli Employee → `EE3H9W`; letters and digits without look-alikes like 0/O and 1/I/L) and never change, even if the person is renamed; the 6-character password is generated and shown once, and **the person must choose their own password the first time they sign in** (the same applies after an admin resets a password). Create, edit, archive and reactivate projects and assign their manager. Approve or reject managers' project requests (approving creates the project, optionally with adjusted budget/dates/manager). See the organisation dashboard, the full **Audit log**, and each project's history. Run the budget check. **Export the audit log as CSV** (with the current filters). See **team availability**. |
+| **Manager** | See and run the projects they manage: schedule, budget, status, **milestones with dependencies**, **tasks** inside each milestone assigned to team members, and **staffing** (hours per week). Staff any employee; staffing someone else's report sends the hours to that employee's manager for **approval**. Approve or reject hours requested for their own reports. Request new projects. Edit their direct reports' basic details. See a **scoped Audit log**: their own activity and their direct reports' (never other managers' or admins'). Dashboard with their team's load this week. **Team availability:** a week-by-week grid of everyone's free hours (their own team or everyone) to plan staffing; export their audit log as CSV. |
+| **Employee** | See the projects they're assigned to, their hours (and hours awaiting approval), the team and milestones - never budgets or costs. **Tick off tasks assigned to them** (from the project or their dashboard). Update their own name and email. Dashboard showing their week against 40 hours (also as time per working day: 16 h/week is about 3 h 12 min a day), a **12-week schedule** (a bar per project, milestone markers, a today line and their hours each week), their open tasks and upcoming milestones. **What's new:** recent changes to their hours, tasks and projects made by others, in plain words, with changes since their last sign-in marked. |
 
-Everything is responsive: a permanent sidebar on desktop, a slide-out menu and simplified tables on phones.
+Everything is responsive: a permanent sidebar on desktop, a slide-out menu and simplified tables on phones. Figures that need explaining (projected labour cost, capacity, the 40-hour rule, budget committed, availability) have an **ⓘ button** that opens a short explanation; it works by tap and keyboard as well as mouse.
 
 ## Business rules
 
@@ -74,11 +74,11 @@ graph LR
 
 ## API reference and Postman tests
 
-- **OpenAPI 3 spec:** [docs/api/openapi.yaml](./docs/api/openapi.yaml) documents all 52 operations across the six services: request and response schemas, who may call each one, the business-rule errors each can return, and examples. It is the single source for everything below.
+- **OpenAPI 3 spec:** [docs/api/openapi.yaml](./docs/api/openapi.yaml) documents all 55 operations across the six services: request and response schemas, who may call each one, the business-rule errors each can return, and examples. It is the single source for everything below.
 - **Swagger UI in the app:** open **`/api-docs`** on any running copy ([live](https://d37hjhs1g613o6.cloudfront.net/api-docs), or http://localhost:3000/api-docs). *Try it out* calls the API of the site you're on: run `login`, copy the `access_token`, click **Authorize**.
 - **SwaggerHub:** *Create New → Import and Document API*, then paste `https://d37hjhs1g613o6.cloudfront.net/openapi.yaml` (or upload the file).
 - **Kept in sync:** `backend/tests/unit/test_openapi.py` fails if a route is added, removed or renamed without updating the spec, and the spec passes [Redocly](https://redocly.com/docs/cli/) lint (`npx @redocly/cli@1.25.11 lint --config docs/api/redocly.yaml docs/api/openapi.yaml`).
-- **Postman suite:** [postman/project-hub.postman_collection.json](./postman/project-hub.postman_collection.json): 93 requests and 311 assertions in 10 folders, run in order as one journey. It signs in as each role, creates its own clearly named data, checks every rule and refusal (400/401/403/404/405/409) and cleans up after itself. Import it into Postman with the [local](./postman/local.postman_environment.json) or [AWS](./postman/aws.postman_environment.json) environment (on AWS, fill in the three passwords), or run it from a terminal with Newman:
+- **Postman suite:** [postman/project-hub.postman_collection.json](./postman/project-hub.postman_collection.json): 98 requests and 329 assertions in 10 folders, run in order as one journey. It signs in as each role, creates its own clearly named data, checks every rule and refusal (400/401/403/404/405/409) and cleans up after itself. Import it into Postman with the [local](./postman/local.postman_environment.json) or [AWS](./postman/aws.postman_environment.json) environment (on AWS, fill in the three passwords), or run it from a terminal with Newman:
 
 ```sh
 ./bin/api-tests.sh            # local stack
@@ -109,12 +109,12 @@ After editing backend code, run `./bin/build-backend.sh` (about a second); Local
 
 ```sh
 cd backend && python3 -m venv .venv && .venv/bin/pip install -r requirements-dev.txt
-.venv/bin/pytest                      # 384 unit + integration tests (uses a separate pm_test database)
+.venv/bin/pytest                      # 424 unit + integration tests (uses a separate pm_test database)
 .venv/bin/ruff check . && .venv/bin/ruff format --check .
-cd ../frontend && npm test            # 185 component/service tests (Vitest + React Testing Library)
+cd ../frontend && npm test            # 204 component/service tests (Vitest + React Testing Library)
 npm run lint && npm run e2e           # ESLint; 22 Playwright journeys + 5 axe accessibility scans
 cd .. && ./bin/smoke-test.sh          # 75 live API checks (local by default, or pass a URL)
-./bin/api-tests.sh                    # Postman collection via Newman: 93 requests, 311 assertions
+./bin/api-tests.sh                    # Postman collection via Newman: 98 requests, 329 assertions
 ```
 
 ## Deploying to AWS
@@ -182,6 +182,7 @@ docs/                workshop guides (unchanged)
 - **Aurora Serverless v2 auto-pauses** after idle time; the first request afterwards can take ~15-20 s while it resumes (the connection timeout allows for this).
 - Not a PWA (installable/offline) - deprioritised for time.
 - Holidays aren't modelled in working-day calculations (Mon-Fri, 8 h/day).
+- **What's new** is built from audit entries that record which employee they are about. Entries from before that was added (migration 8) have no such link, and the log is append-only, so they are not back-filled. When a task moves from one person to another, only the new assignee is told.
 
 ---
 

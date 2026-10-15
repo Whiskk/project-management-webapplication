@@ -5,7 +5,8 @@ Role dashboards (under /api/projects/dashboard).
 
     admin     organisation totals, budget committed, projects needing attention
     manager   my projects needing attention, decisions waiting for me, my team's load this week
-    employee  my hours this week, my projects and their timeline, upcoming milestones, my open tasks
+    employee  my hours this week, my projects and their timeline, upcoming milestones, my open tasks,
+              and what changed for me recently (whats_new.py)
 
 Must be registered before routes matching ``/{id}``.
 """
@@ -21,6 +22,7 @@ from pm_core.capacity import MAX_WEEKLY_HOURS
 from pm_core.db import transaction
 from pm_core.http import Request, Response, Router, ok
 from queries import SELECT_PROJECT, attach_my_hours, serialize, visibility_condition
+from whats_new import whats_new
 
 ATTENTION_LIMIT = 8
 
@@ -232,6 +234,7 @@ def _employee(cur: psycopg.Cursor, actor: Actor) -> dict:
         "projects": [_summary(p) for p in live],
         "upcoming_milestones": upcoming,
         "my_tasks": my_tasks,
+        "whats_new": whats_new(cur, actor),
     }
 
 
