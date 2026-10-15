@@ -137,6 +137,8 @@ Sign in as `AA7K2P` with that password and reset the others from **Users**.
 
 > Deployments seeded before the initials-based ID format list the demo passwords under the old IDs (`ADM001`, `MGR001`, `EMP001`). Migration 5 converted those accounts to `AA7K2P`, `MM4R8T` and `EE3H9W` with the same passwords, and logged the old → new mapping for any other users (`grep "Employee IDs converted"` in the same log).
 
+**Alternatively, test Admin access and associated functions from the user id `DAGY3M` and password `test1234` on live. Since this is just a demo and not being used for real world functions, this is safe.**
+
 ## Repository layout
 
 ```
