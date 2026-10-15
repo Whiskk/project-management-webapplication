@@ -1,5 +1,6 @@
 import { Link as RouterLink } from 'react-router';
 import Box from '@mui/material/Box';
+import { alpha } from '@mui/material/styles';
 import Card from '@mui/material/Card';
 import CardContent from '@mui/material/CardContent';
 import Link from '@mui/material/Link';
@@ -12,14 +13,23 @@ import { addDays, buildWeeks, percentAlong, todayIso, weeklyHours } from '../../
 const WEEKS = 12;
 const WINDOW_DAYS = WEEKS * 7;
 const MAX_WEEKLY_HOURS = 40;
-// Project names stay pinned on the left while the weeks scroll sideways on small screens.
-const COLUMNS = { xs: '150px 1fr', sm: '230px 1fr' };
+// Each day gets a fixed width, so days are easy to tell apart; the weeks scroll sideways
+// while project names stay pinned on the left.
+const DAY_PX = 22;
+const WEEK_PX = DAY_PX * 7;
+const TRACK_PX = WEEK_PX * WEEKS;
+const COLUMNS = { xs: `150px ${TRACK_PX}px`, sm: `230px ${TRACK_PX}px` };
 const pinned = { position: 'sticky', left: 0, zIndex: 2, bgcolor: 'background.paper' };
+const DAY_LETTERS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
 
-// Week separators drawn behind every row of the timeline.
-const weekLines = {
-  backgroundImage: (theme) => `linear-gradient(to right, ${theme.palette.divider} 1px, transparent 1px)`,
-  backgroundSize: `calc(100% / ${WEEKS}) 100%`,
+// Drawn behind every row: strong lines between weeks, faint lines between days, shaded weekends.
+const dayGrid = {
+  backgroundImage: (theme) => [
+    `linear-gradient(to right, ${theme.palette.divider} 1px, transparent 1px)`,
+    `linear-gradient(to right, ${alpha(theme.palette.text.secondary, 0.12)} 1px, transparent 1px)`,
+    `linear-gradient(to right, transparent ${5 * DAY_PX}px, ${theme.palette.action.hover} ${5 * DAY_PX}px)`,
+  ].join(', '),
+  backgroundSize: `${WEEK_PX}px 100%, ${DAY_PX}px 100%, ${WEEK_PX}px 100%`,
 };
 
 /** "16 h/week · 3 h 12 min a day", or what is waiting for approval. */
@@ -60,7 +70,7 @@ function ProjectRow({ project, windowStart, windowEnd, today, todayAt }) {
           </Typography>
         )}
       </Box>
-      <Box sx={{ position: 'relative', borderTop: 1, borderColor: 'divider', ...weekLines }}>
+      <Box sx={{ position: 'relative', borderTop: 1, borderColor: 'divider', ...dayGrid }}>
         {startsLater || alreadyEnded ? (
           <Typography
             variant="caption"
@@ -100,7 +110,8 @@ function ProjectRow({ project, windowStart, windowEnd, today, todayAt }) {
                   sx={{
                     position: 'absolute',
                     top: 22,
-                    left: `calc(${percentAlong(addDays(milestone.due_date, 1), windowStart, WINDOW_DAYS)}% - 6px)`,
+                    // Centred on its due day.
+                    left: `calc(${percentAlong(milestone.due_date, windowStart, WINDOW_DAYS)}% + ${DAY_PX / 2 - 6}px)`,
                     width: 12,
                     height: 12,
                     transform: 'rotate(45deg)',
@@ -134,7 +145,7 @@ function LoadRow({ weeks }) {
         <Typography variant="body2" fontWeight={600}>My hours each week</Typography>
         <Typography variant="caption" color="text.secondary" component="p">of 40 (8 h a day)</Typography>
       </Box>
-      <Box sx={{ position: 'relative', display: 'grid', gridTemplateColumns: `repeat(${WEEKS}, 1fr)`, ...weekLines }}>
+      <Box sx={{ position: 'relative', display: 'grid', gridTemplateColumns: `repeat(${WEEKS}, ${WEEK_PX}px)`, ...dayGrid }}>
         {weeks.map((week, index) => {
           const total = week.confirmed + week.pending;
           const tone = total > MAX_WEEKLY_HOURS ? 'error.main' : total >= 36 ? 'warning.main' : 'text.primary';
@@ -145,16 +156,17 @@ function LoadRow({ weeks }) {
               role="img"
               aria-label={`Week of ${formatDate(week.start)}: ${formatHours(week.confirmed)} of 40${pendingNote}`}
               sx={{
-                display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end', py: 1, gap: 0.5,
+                // The bar spans Monday to Friday, lining up with the working days above.
+                display: 'flex', flexDirection: 'column', alignItems: 'flex-start', justifyContent: 'flex-end', py: 1, pl: '3px', gap: 0.5,
                 ...(index === 0 && { bgcolor: 'action.hover' }),
               }}
             >
-              <Box sx={{ width: '45%', height: 36, display: 'flex', flexDirection: 'column-reverse', bgcolor: 'action.hover', borderRadius: 0.5, overflow: 'hidden' }}>
+              <Box sx={{ width: 5 * DAY_PX - 6, height: 36, display: 'flex', flexDirection: 'column-reverse', bgcolor: 'action.hover', borderRadius: 0.5, overflow: 'hidden' }}>
                 <Box sx={{ height: `${(Math.min(week.confirmed, MAX_WEEKLY_HOURS) / MAX_WEEKLY_HOURS) * 100}%`, bgcolor: 'primary.main' }} />
                 <Box sx={{ height: `${(Math.min(week.pending, MAX_WEEKLY_HOURS) / MAX_WEEKLY_HOURS) * 100}%`, bgcolor: 'warning.main', opacity: 0.6 }} />
               </Box>
-              <Typography variant="caption" color={tone} fontWeight={index === 0 ? 700 : 400} sx={{ fontVariantNumeric: 'tabular-nums' }}>
-                {Number(total.toFixed(1))}
+              <Typography variant="caption" color={tone} fontWeight={index === 0 ? 700 : 400} sx={{ fontVariantNumeric: 'tabular-nums', width: 5 * DAY_PX - 6, textAlign: 'center' }}>
+                {Number(total.toFixed(1))} h
               </Typography>
             </Box>
           );
@@ -189,7 +201,9 @@ export default function MySchedule({ schedule, today = todayIso() }) {
   const weeks = weeklyHours(schedule, buildWeeks(today, WEEKS));
   const windowStart = weeks[0].start;
   const windowEnd = addDays(windowStart, WINDOW_DAYS);
-  const todayAt = percentAlong(today, windowStart, WINDOW_DAYS);
+  // Today's line sits in the middle of today's column.
+  const todayAt = percentAlong(today, windowStart, WINDOW_DAYS) + 100 / WINDOW_DAYS / 2;
+  const days = Array.from({ length: WINDOW_DAYS }, (_, i) => addDays(windowStart, i));
 
   return (
     <Card component="section" aria-labelledby="my-schedule-heading">
@@ -202,19 +216,51 @@ export default function MySchedule({ schedule, today = todayIso() }) {
           <Typography color="text.secondary">You aren't on any current projects.</Typography>
         ) : (
           <>
-            <Typography variant="caption" color="text.secondary" sx={{ display: { xs: 'block', md: 'none' }, mb: 1 }}>
-              Swipe sideways to see all 12 weeks.
+            <Typography variant="caption" color="text.secondary" component="p" sx={{ mb: 1 }}>
+              Scroll sideways to see all 12 weeks. Weekends are shaded.
             </Typography>
             <Box role="region" aria-label="Schedule timeline" tabIndex={0} sx={{ overflowX: 'auto', '&:focus-visible': { outline: 2, outlineColor: 'primary.light', outlineStyle: 'solid' } }}>
-              <Box sx={{ minWidth: { xs: 680, md: 760 } }}>
+              <Box sx={{ width: 'max-content' }}>
                 <Box aria-hidden sx={{ display: 'grid', gridTemplateColumns: COLUMNS }}>
                   <Box sx={pinned} />
-                  <Box sx={{ position: 'relative', display: 'grid', gridTemplateColumns: `repeat(${WEEKS}, 1fr)`, pb: 0.5 }}>
-                    {weeks.map((week, index) => (
-                      <Typography key={week.start} variant="caption" color={index === 0 ? 'text.primary' : 'text.secondary'} sx={{ pl: 0.5, whiteSpace: 'nowrap' }}>
-                        {index === 0 ? 'This week' : formatShortDate(week.start)}
-                      </Typography>
-                    ))}
+                  <Box>
+                    <Box sx={{ display: 'grid', gridTemplateColumns: `repeat(${WEEKS}, ${WEEK_PX}px)` }}>
+                      {weeks.map((week, index) => (
+                        <Typography
+                          key={week.start}
+                          variant="caption"
+                          fontWeight={index === 0 ? 600 : 400}
+                          color={index === 0 ? 'text.primary' : 'text.secondary'}
+                          sx={{ pl: 0.75, whiteSpace: 'nowrap', borderLeft: 1, borderColor: 'divider' }}
+                        >
+                          {index === 0 ? `This week · ${formatShortDate(week.start)}` : `Week of ${formatShortDate(week.start)}`}
+                        </Typography>
+                      ))}
+                    </Box>
+                    <Box sx={{ display: 'grid', gridTemplateColumns: `repeat(${WINDOW_DAYS}, ${DAY_PX}px)`, pb: 0.5 }}>
+                      {days.map((day, index) => {
+                        const isToday = day === today;
+                        const weekend = index % 7 >= 5;
+                        return (
+                          <Box
+                            key={day}
+                            sx={{
+                              textAlign: 'center',
+                              lineHeight: 1.15,
+                              fontSize: '0.68rem',
+                              py: 0.25,
+                              borderRadius: 0.5,
+                              color: isToday ? 'secondary.contrastText' : weekend ? 'text.disabled' : 'text.secondary',
+                              bgcolor: isToday ? 'secondary.main' : 'transparent',
+                              fontWeight: isToday ? 700 : 400,
+                            }}
+                          >
+                            <div>{DAY_LETTERS[index % 7]}</div>
+                            <div>{Number(day.slice(8))}</div>
+                          </Box>
+                        );
+                      })}
+                    </Box>
                   </Box>
                 </Box>
                 <Box component="ul" aria-label="My projects over the next 12 weeks" sx={{ listStyle: 'none', m: 0, p: 0 }}>
