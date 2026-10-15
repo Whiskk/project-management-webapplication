@@ -7,11 +7,11 @@ Results below are from **14 October 2026**, from local runs of the latest code a
 
 | Layer | Tool | Tests | Result | Coverage |
 |---|---|---|---|---|
-| Backend unit + integration | pytest (+ pytest-cov) against a real PostgreSQL `pm_test` database | **424** | ✅ all pass | **98%** of backend code (2,402 statements, 40 uncovered) |
+| Backend unit + integration | pytest (+ pytest-cov) against a real PostgreSQL `pm_test` database | **428** | ✅ all pass | **98%** of backend code (2,413 statements, 40 uncovered) |
 | Frontend components + services | Vitest + React Testing Library | **204** | ✅ all pass | **91.5% lines**, 90.4% statements, 87.0% branches, 83.7% functions |
 | End-to-end (browser) | Playwright (Chromium desktop + Pixel 7 mobile) | **22 journeys** | ✅ all pass locally (18 also confirmed on AWS; the 4 newest not yet run there) | all critical user paths (below) |
 | Accessibility | axe-core in Playwright, WCAG 2.0/2.1/2.2 A and AA | **5 scans, 20+ screens** | ✅ no violations | every page for every role, key dialogs, error states, phone menu |
-| API test suite | Postman collection run by Newman (`bin/api-tests.sh`) | **98 requests, 329 assertions** | ✅ 329/329 locally | every service, role rule and business-rule refusal |
+| API test suite | Postman collection run by Newman (`bin/api-tests.sh`) | **98 requests, 329 assertions** | ✅ 329/329 locally and on AWS | every service, role rule and business-rule refusal |
 | API contract | OpenAPI 3 spec; Redocly lint; pytest check against the routers | **55 operations** | ✅ valid, and in sync with the code | every route the services register |
 | Live API smoke test | `bin/smoke-test.sh` (curl) | **75 checks** | ✅ 75/75 **locally and on AWS** | every service and business rule |
 | Load | Artillery | 700 virtual users, 4,200 requests | ✅ 0 errors on AWS | see [Performance](#performance) |

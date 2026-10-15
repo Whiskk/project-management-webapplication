@@ -109,7 +109,7 @@ After editing backend code, run `./bin/build-backend.sh` (about a second); Local
 
 ```sh
 cd backend && python3 -m venv .venv && .venv/bin/pip install -r requirements-dev.txt
-.venv/bin/pytest                      # 424 unit + integration tests (uses a separate pm_test database)
+.venv/bin/pytest                      # 428 unit + integration tests (uses a separate pm_test database)
 .venv/bin/ruff check . && .venv/bin/ruff format --check .
 cd ../frontend && npm test            # 204 component/service tests (Vitest + React Testing Library)
 npm run lint && npm run e2e           # ESLint; 22 Playwright journeys + 5 axe accessibility scans
