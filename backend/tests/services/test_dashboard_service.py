@@ -117,3 +117,77 @@ def test_salary_cut_is_not_flagged(running: int) -> None:
     with db.transaction() as cur:
         cur.execute("SELECT summary FROM audit_log WHERE action = 'user.update' ORDER BY id DESC LIMIT 1")
         assert "over budget" not in cur.fetchone()["summary"]
+
+
+def test_employee_schedule_lists_projects_with_hours_and_milestones(running: int) -> None:
+    """The timeline gets each current project's dates, confirmed and pending hours, and every milestone."""
+    today = date.today()
+    monday = today - timedelta(days=today.weekday())
+    for title, due in (("Launch", 9), ("Kick-off", 4)):
+        call(
+            projects,
+            "POST",
+            f"/{running}/milestones",
+            "MM4R8T",
+            {"title": title, "start_date": monday.isoformat(), "due_date": (monday + timedelta(days=due)).isoformat()},
+        )
+    # A second project where the admin's request for Eli's hours awaits approval, and an archived one.
+    later = {"budget": 100000, "manager_id": user_id("MM4R8T"), "status": "planned"}
+    _, pending = call(
+        projects,
+        "POST",
+        "/",
+        "AA7K2P",
+        {
+            **later,
+            "name": "Borealis",
+            "start_date": (monday + timedelta(days=14)).isoformat(),
+            "predicted_end_date": (monday + timedelta(days=60)).isoformat(),
+        },
+    )
+    assert (
+        call(
+            projects,
+            "POST",
+            f"/{pending['id']}/assignments",
+            "AA7K2P",
+            {"user_id": user_id("EE3H9W"), "hours_per_week": 6},
+        )[0]
+        == 201
+    )
+    _, archived = call(
+        projects,
+        "POST",
+        "/",
+        "AA7K2P",
+        {
+            **later,
+            "name": "Cosmos",
+            "start_date": monday.isoformat(),
+            "predicted_end_date": (monday + timedelta(days=30)).isoformat(),
+        },
+    )
+    call(
+        projects,
+        "POST",
+        f"/{archived['id']}/assignments",
+        "MM4R8T",
+        {"user_id": user_id("EE3H9W"), "hours_per_week": 2},
+    )
+    call(projects, "POST", f"/{archived['id']}/archive", "AA7K2P")
+
+    _, body = call(projects, "GET", "/dashboard", "EE3H9W")
+    apollo, borealis = body["schedule"]  # archived projects are left out; earliest start first
+    assert (apollo["name"], apollo["hours_per_week"], apollo["pending_hours"]) == ("Apollo", 10.0, None)
+    assert apollo["start_date"] == monday.isoformat()
+    assert [m["title"] for m in apollo["milestones"]] == ["Kick-off", "Launch"]  # by due date
+    assert set(apollo["milestones"][0]) == {"id", "title", "due_date", "status"}
+    assert (borealis["name"], borealis["hours_per_week"], borealis["pending_hours"]) == ("Borealis", None, 6.0)
+    assert borealis["milestones"] == []
+
+
+def test_schedule_is_empty_without_projects(fresh_db: None) -> None:
+    _, body = call(projects, "GET", "/dashboard", "EE3H9W")
+    assert body["schedule"] == []
+    _, manager = call(projects, "GET", "/dashboard", "MM4R8T")
+    assert "schedule" not in manager

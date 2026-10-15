@@ -1927,7 +1927,7 @@ components:
               available: { type: number }
     EmployeeDashboard:
       type: object
-      required: [role, stats, projects, upcoming_milestones, my_tasks]
+      required: [role, stats, projects, schedule, upcoming_milestones, my_tasks]
       properties:
         role: { type: string, enum: [employee] }
         stats:
@@ -1939,6 +1939,31 @@ components:
             my_projects: { type: integer }
             open_tasks: { type: integer }
         projects: { type: array, items: { $ref: "#/components/schemas/DashboardProject" } }
+        schedule:
+          type: array
+          description: "My current projects for the timeline, earliest start first: dates, hours and every milestone."
+          items:
+            type: object
+            required: [project_id, name, status, start_date, predicted_end_date, hours_per_week, pending_hours, milestones]
+            properties:
+              project_id: { type: integer }
+              name: { type: string }
+              status: { $ref: "#/components/schemas/ProjectStatus" }
+              start_date: { type: string, format: date }
+              predicted_end_date: { type: string, format: date }
+              hours_per_week: { type: number, nullable: true, description: Confirmed hours (null while a new assignment awaits approval). }
+              pending_hours: { type: number, nullable: true, description: "Hours awaiting my manager's approval (a new assignment or an increase)." }
+              milestones:
+                type: array
+                description: By due date.
+                items:
+                  type: object
+                  required: [id, title, due_date, status]
+                  properties:
+                    id: { type: integer }
+                    title: { type: string }
+                    due_date: { type: string, format: date }
+                    status: { $ref: "#/components/schemas/MilestoneStatus" }
         upcoming_milestones:
           type: array
           description: Up to 6 open milestones on my projects, soonest due first.

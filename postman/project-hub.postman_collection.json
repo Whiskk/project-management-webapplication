@@ -3128,6 +3128,12 @@
                   "    const task = body.my_tasks.find((t) => String(t.id) === pm.collectionVariables.get(\"taskId\"));",
                   "    pm.expect(task.milestone_title).to.eql('Build');",
                   "    pm.expect(task.waiting).to.eql(true);",
+                  "});",
+                  "pm.test(\"The project is on their schedule with its hours and milestones\", () => {",
+                  "    const body = pm.response.json();",
+                  "    const entry = body.schedule.find((p) => String(p.project_id) === pm.collectionVariables.get(\"projectId\"));",
+                  "    pm.expect(entry.hours_per_week).to.eql(4);",
+                  "    pm.expect(entry.milestones.map((m) => m.title)).to.eql(['Design', 'Build']);",
                   "});"
                 ]
               }

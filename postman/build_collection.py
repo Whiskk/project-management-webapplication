@@ -964,6 +964,12 @@ milestones = folder(
                     "pm.expect(task.milestone_title).to.eql('Build');",
                     "pm.expect(task.waiting).to.eql(true);",
                 ),
+                check(
+                    "The project is on their schedule with its hours and milestones",
+                    'const entry = body.schedule.find((p) => String(p.project_id) === pm.collectionVariables.get("projectId"));',
+                    "pm.expect(entry.hours_per_week).to.eql(4);",
+                    "pm.expect(entry.milestones.map((m) => m.title)).to.eql(['Design', 'Build']);",
+                ),
             ),
         ),
         request(

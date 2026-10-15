@@ -87,6 +87,11 @@ test('managers assign tasks inside milestones and employees tick them off', asyn
   await signIn(page, 'employee');
   const myTasks = page.getByRole('list', { name: 'My tasks' });
   await expect(myTasks.getByRole('checkbox', { name: api })).toBeDisabled();
+  // The project is on Eli's schedule, with the weekly hours also given per day.
+  const schedule = page.getByRole('list', { name: 'My projects over the next 12 weeks' });
+  const row = schedule.getByRole('listitem').filter({ has: page.getByRole('link', { name, exact: true }) });
+  await expect(row.getByText('4 h/week · 48 min a day')).toBeVisible();
+  await expect(row.getByText('Starts Jul 5, 2032')).toBeVisible();
   await expectAccessible(page, 'employee dashboard with tasks');
   await myTasks.getByRole('checkbox', { name: wireframes }).click(); // the task then leaves the list
   await expect(page.getByText(`Completed '${wireframes}'`)).toBeVisible();

@@ -16,12 +16,13 @@ import Typography from '@mui/material/Typography';
 import { useAuth } from '../auth/authContext';
 import { ROLE_LABELS } from '../auth/permissions';
 import BudgetCheckButton from '../components/dashboard/BudgetCheckButton';
+import MySchedule from '../components/dashboard/MySchedule';
 import MyTasks from '../components/dashboard/MyTasks';
 import { AttentionList, CapacityBar, StatTile } from '../components/dashboard/DashboardWidgets';
 import SystemStatus from '../components/dashboard/SystemStatus';
 import useApiResource from '../hooks/useApiResource';
 import { projectsApi } from '../services/projectsApi';
-import { formatCurrency, formatDate, formatHours, fullName } from '../utils/format';
+import { formatCurrency, formatDailyHours, formatDate, formatHours, fullName } from '../utils/format';
 
 function AdminDashboard({ data, onRefresh }) {
   const { stats } = data;
@@ -130,6 +131,9 @@ function EmployeeDashboard({ data, onRefresh }) {
             <Typography variant="h2" component="p">
               {formatHours(stats.hours_this_week)} <Typography component="span" color="text.secondary">of {formatHours(stats.capacity)}</Typography>
             </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+              About {formatDailyHours(stats.hours_this_week)} a day of your 8-hour day
+            </Typography>
             <CapacityBar used={stats.hours_this_week} capacity={stats.capacity} label="My hours this week" />
             {Number(stats.hours_awaiting_approval) > 0 && (
               <Typography variant="body2" color="warning.main" sx={{ mt: 1 }}>
@@ -154,7 +158,7 @@ function EmployeeDashboard({ data, onRefresh }) {
                       secondary={`Ends ${formatDate(project.predicted_end_date)} · ${project.milestones.completed}/${project.milestones.total} milestones done`}
                     />
                     {project.my_hours_per_week !== null
-                      ? <Chip size="small" label={`${formatHours(project.my_hours_per_week)}/week`} />
+                      ? <Chip size="small" label={`${formatHours(project.my_hours_per_week)}/week · ${formatDailyHours(project.my_hours_per_week)} a day`} />
                       : <Chip size="small" color="warning" variant="outlined" label="Pending approval" />}
                   </ListItem>
                 ))}
@@ -162,6 +166,9 @@ function EmployeeDashboard({ data, onRefresh }) {
             )}
           </CardContent>
         </Card>
+      </Grid>
+      <Grid size={12}>
+        <MySchedule schedule={data.schedule ?? []} />
       </Grid>
       <Grid size={12}>
         <MyTasks tasks={data.my_tasks ?? []} onChanged={onRefresh} />

@@ -5,7 +5,7 @@ Role dashboards (under /api/projects/dashboard).
 
     admin     organisation totals, budget committed, projects needing attention
     manager   my projects needing attention, decisions waiting for me, my team's load this week
-    employee  my hours this week, my projects, upcoming milestones, my open tasks
+    employee  my hours this week, my projects and their timeline, upcoming milestones, my open tasks
 
 Must be registered before routes matching ``/{id}``.
 """
@@ -140,6 +140,39 @@ def _manager(cur: psycopg.Cursor, actor: Actor) -> dict:
     }
 
 
+def _schedule(cur: psycopg.Cursor, user_id: int) -> list[dict]:
+    """
+    The employee's current projects for their timeline: dates, hours and milestones.
+
+    ``hours_per_week`` is confirmed time (null while a new assignment awaits
+    approval); ``pending_hours`` is time awaiting their manager's approval, as
+    on the project team list.
+    """
+    cur.execute(
+        """
+        SELECT p.id AS project_id, p.name, p.status, p.start_date, p.predicted_end_date,
+               CASE WHEN a.status = 'approved' THEN a.hours_per_week END AS hours_per_week,
+               CASE WHEN a.status = 'pending' THEN a.hours_per_week ELSE a.pending_hours END AS pending_hours
+        FROM project_assignments a JOIN projects p ON p.id = a.project_id
+        WHERE a.user_id = %s AND NOT p.is_archived AND p.status <> 'completed'
+        ORDER BY p.start_date, p.id
+        """,
+        (user_id,),
+    )
+    schedule = [{**row, "milestones": []} for row in cur.fetchall()]
+    by_project = {entry["project_id"]: entry for entry in schedule}
+    if by_project:
+        cur.execute(
+            "SELECT id, project_id, title, due_date, status FROM milestones WHERE project_id = ANY(%s) "
+            "ORDER BY due_date, id",
+            (list(by_project),),
+        )
+        for milestone in cur.fetchall():
+            project_id = milestone.pop("project_id")
+            by_project[project_id]["milestones"].append(milestone)
+    return schedule
+
+
 def _employee(cur: psycopg.Cursor, actor: Actor) -> dict:
     projects = _current_projects(cur, actor)
     live = [p for p in projects if p["status"] != "completed"]
@@ -187,6 +220,7 @@ def _employee(cur: psycopg.Cursor, actor: Actor) -> dict:
     )
     my_tasks = cur.fetchall()
     return {
+        "schedule": _schedule(cur, actor.id),
         "role": "employee",
         "stats": {
             "hours_this_week": week["confirmed"],

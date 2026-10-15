@@ -66,7 +66,7 @@ describe('HomePage dashboards', () => {
     expect(screen.getByRole('link', { name: /Approvals waiting/ })).toHaveAttribute('href', '/approvals');
   });
 
-  it('shows employees their week, projects and upcoming milestones', async () => {
+  it('shows employees their week, projects, schedule and upcoming milestones', async () => {
     renderAs('employee', {
       role: 'employee',
       stats: { hours_this_week: 25, hours_awaiting_approval: 5, capacity: 40, my_projects: 2 },
@@ -75,9 +75,16 @@ describe('HomePage dashboards', () => {
         { id: 8, name: 'Gemini', predicted_end_date: '2026-12-18', my_hours_per_week: null, milestones: { total: 0, completed: 0 } },
       ],
       upcoming_milestones: [{ id: 1, title: 'Design sign-off', project_name: 'Apollo', due_date: '2026-11-06', overdue: true }],
+      schedule: [{
+        project_id: 7, name: 'Apollo', status: 'active', start_date: '2026-10-01', predicted_end_date: '2026-11-30',
+        hours_per_week: 25, pending_hours: null, milestones: [],
+      }],
     });
     expect(await screen.findByText('5 h more awaiting your manager\'s approval')).toBeInTheDocument();
-    expect(screen.getByText('25 h/week')).toBeInTheDocument();
+    expect(screen.getByText('About 5 h a day of your 8-hour day')).toBeInTheDocument();
+    expect(within(screen.getByRole('list', { name: 'My projects' })).getByText('25 h/week · 5 h a day')).toBeInTheDocument();
+    const schedule = screen.getByRole('list', { name: 'My projects over the next 12 weeks' });
+    expect(within(schedule).getByRole('link', { name: 'Apollo' })).toBeInTheDocument();
     expect(screen.getByText('Pending approval')).toBeInTheDocument();
     const milestones = screen.getByRole('list', { name: 'Upcoming milestones' });
     expect(within(milestones).getByText('Design sign-off')).toBeInTheDocument();

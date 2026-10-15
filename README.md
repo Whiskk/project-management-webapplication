@@ -31,7 +31,7 @@ Built for the Citi Coding Workshop (Full Stack track) on the required stack: **R
 |---|---|
 | **Admin** | Create every account. **Employee IDs are generated from the person's initials plus 4 random characters** (e.g. Eli Employee → `EE3H9W`; letters and digits without look-alikes like 0/O and 1/I/L) and never change, even if the person is renamed; the 6-character password is generated and shown once, and **the person must choose their own password the first time they sign in** (the same applies after an admin resets a password). Create, edit, archive and reactivate projects and assign their manager. Approve or reject managers' project requests (approving creates the project, optionally with adjusted budget/dates/manager). See the organisation dashboard, the full **Audit log**, and each project's history. Run the budget check. |
 | **Manager** | See and run the projects they manage: schedule, budget, status, **milestones with dependencies**, **tasks** inside each milestone assigned to team members, and **staffing** (hours per week). Staff any employee; staffing someone else's report sends the hours to that employee's manager for **approval**. Approve or reject hours requested for their own reports. Request new projects. Edit their direct reports' basic details. See a **scoped Audit log**: their own activity and their direct reports' (never other managers' or admins'). Dashboard with their team's load this week. |
-| **Employee** | See the projects they're assigned to, their hours (and hours awaiting approval), the team and milestones - never budgets or costs. **Tick off tasks assigned to them** (from the project or their dashboard). Update their own name and email. Dashboard showing their week against 40 hours, their open tasks and upcoming milestones. |
+| **Employee** | See the projects they're assigned to, their hours (and hours awaiting approval), the team and milestones - never budgets or costs. **Tick off tasks assigned to them** (from the project or their dashboard). Update their own name and email. Dashboard showing their week against 40 hours (also as time per working day: 16 h/week is about 3 h 12 min a day), a **12-week schedule** (a bar per project, milestone markers, a today line and their hours each week), their open tasks and upcoming milestones. |
 
 Everything is responsive: a permanent sidebar on desktop, a slide-out menu and simplified tables on phones.
 
@@ -78,7 +78,7 @@ graph LR
 - **Swagger UI in the app:** open **`/api-docs`** on any running copy ([live](https://d37hjhs1g613o6.cloudfront.net/api-docs), or http://localhost:3000/api-docs). *Try it out* calls the API of the site you're on: run `login`, copy the `access_token`, click **Authorize**.
 - **SwaggerHub:** *Create New → Import and Document API*, then paste `https://d37hjhs1g613o6.cloudfront.net/openapi.yaml` (or upload the file).
 - **Kept in sync:** `backend/tests/unit/test_openapi.py` fails if a route is added, removed or renamed without updating the spec, and the spec passes [Redocly](https://redocly.com/docs/cli/) lint (`npx @redocly/cli@1.25.11 lint --config docs/api/redocly.yaml docs/api/openapi.yaml`).
-- **Postman suite:** [postman/project-hub.postman_collection.json](./postman/project-hub.postman_collection.json): 90 requests and 300 assertions in 10 folders, run in order as one journey. It signs in as each role, creates its own clearly named data, checks every rule and refusal (400/401/403/404/405/409) and cleans up after itself. Import it into Postman with the [local](./postman/local.postman_environment.json) or [AWS](./postman/aws.postman_environment.json) environment (on AWS, fill in the three passwords), or run it from a terminal with Newman:
+- **Postman suite:** [postman/project-hub.postman_collection.json](./postman/project-hub.postman_collection.json): 90 requests and 301 assertions in 10 folders, run in order as one journey. It signs in as each role, creates its own clearly named data, checks every rule and refusal (400/401/403/404/405/409) and cleans up after itself. Import it into Postman with the [local](./postman/local.postman_environment.json) or [AWS](./postman/aws.postman_environment.json) environment (on AWS, fill in the three passwords), or run it from a terminal with Newman:
 
 ```sh
 ./bin/api-tests.sh            # local stack
@@ -109,12 +109,12 @@ After editing backend code, run `./bin/build-backend.sh` (about a second); Local
 
 ```sh
 cd backend && python3 -m venv .venv && .venv/bin/pip install -r requirements-dev.txt
-.venv/bin/pytest                      # 376 unit + integration tests (uses a separate pm_test database)
+.venv/bin/pytest                      # 378 unit + integration tests (uses a separate pm_test database)
 .venv/bin/ruff check . && .venv/bin/ruff format --check .
-cd ../frontend && npm test            # 168 component/service tests (Vitest + React Testing Library)
+cd ../frontend && npm test            # 185 component/service tests (Vitest + React Testing Library)
 npm run lint && npm run e2e           # ESLint; 22 Playwright journeys + 5 axe accessibility scans
 cd .. && ./bin/smoke-test.sh          # 75 live API checks (local by default, or pass a URL)
-./bin/api-tests.sh                    # Postman collection via Newman: 90 requests, 300 assertions
+./bin/api-tests.sh                    # Postman collection via Newman: 90 requests, 301 assertions
 ```
 
 ## Deploying to AWS

@@ -28,7 +28,7 @@ import MilestonesSection from '../components/projects/MilestonesSection';
 import TeamSection from '../components/projects/TeamSection';
 import useApiResource from '../hooks/useApiResource';
 import { projectsApi } from '../services/projectsApi';
-import { formatCurrency, formatDate, formatHours } from '../utils/format';
+import { formatCurrency, formatDailyHours, formatDate, formatHours } from '../utils/format';
 
 function Stat({ label, value, hint }) {
   return (
@@ -181,7 +181,7 @@ export default function ProjectDetailPage() {
                 value={formatHours(data.my_hours_per_week ?? 0)}
                 hint={data.my_pending_hours !== null
                   ? `per week · ${formatHours(data.my_pending_hours)} awaiting your manager's approval`
-                  : `per week · team of ${data.team_size}`}
+                  : `per week · about ${formatDailyHours(data.my_hours_per_week ?? 0)} a day · team of ${data.team_size}`}
               />
             )}
         </Grid>
