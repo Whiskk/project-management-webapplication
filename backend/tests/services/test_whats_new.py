@@ -136,6 +136,32 @@ def test_marks_changes_since_the_previous_sign_in_as_new(apollo: int) -> None:
 
 
 @pytest.mark.db
+def test_approved_cross_team_requests(apollo: int) -> None:
+    # Regression: approving a new request records no hours change, which crashed the dashboard.
+    assignment = ok("POST", f"/{apollo}/assignments", "AA7K2P", {"user_id": user_id(ELI), "hours_per_week": 6})["id"]
+    ok("POST", f"/{apollo}/assignments/{assignment}/approve", "MM4R8T")
+    ok("PATCH", f"/{apollo}/assignments/{assignment}", "AA7K2P", {"hours_per_week": 9})
+    ok("POST", f"/{apollo}/assignments/{assignment}/approve", "MM4R8T")
+    assert texts()[:4] == [
+        "Morgan Manager approved your 9 h/week on Apollo",
+        "Alex Admin asked to raise your hours on Apollo to 9 h/week. It's waiting for your manager's approval.",
+        "Morgan Manager approved your hours on Apollo",
+        "Alex Admin asked for 6 h/week of your time on Apollo. It's waiting for your manager's approval.",
+    ]
+
+
+@pytest.mark.db
+def test_an_entry_that_cannot_be_described_is_skipped(apollo: int, monkeypatch: pytest.MonkeyPatch) -> None:
+    ok("POST", f"/{apollo}/assignments", "MM4R8T", {"user_id": user_id(ELI), "hours_per_week": 10})
+
+    def broken(row: dict, me: str) -> str:
+        raise TypeError("unexpected entry")
+
+    monkeypatch.setattr(whats_new, "describe", broken)
+    assert feed()["items"] == []  # the dashboard still loads
+
+
+@pytest.mark.db
 def test_only_employees_get_the_feed(apollo: int) -> None:
     assert "whats_new" not in ok("GET", "/dashboard", "MM4R8T")
 
@@ -173,8 +199,17 @@ def row(action: str, changes: dict, title: str | None = None) -> dict:
             "The requested increase to your hours on Apollo was cancelled",
         ),
         (
-            row("assignment.approve", {"status": ("pending", "approved"), "hours_per_week": (None, 7.5)}),
+            # Approving a new assignment: only the status changes, so no hours are recorded.
+            row("assignment.approve", {"status": ("pending", "approved")}),
+            "Morgan Manager approved your hours on Apollo",
+        ),
+        (
+            row("assignment.approve", {"hours_per_week": (5, 7.5), "pending_hours": (7.5, None)}),
             "Morgan Manager approved your 7.5 h/week on Apollo",
+        ),
+        (
+            row("assignment.update", {"status": ("pending", "approved")}),
+            "Morgan Manager added you to Apollo",
         ),
         (
             row("assignment.reject", {"status": ("pending", None), "hours_per_week": (8, None)}),

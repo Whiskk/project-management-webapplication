@@ -14,12 +14,15 @@ summary, so nothing an employee may not see (budgets, costs, other people's
 hours) can leak through. Entries since their previous sign-in are marked new.
 """
 
+import logging
 from datetime import date, datetime
 from typing import Any
 
 import psycopg
 
 from pm_core.audit import Actor
+
+logger = logging.getLogger()
 
 WINDOW_DAYS = 14
 LIMIT = 10
@@ -57,6 +60,11 @@ def _hours(value: Any) -> str:
     return f"{float(value):g} h/week"
 
 
+def _for_hours(value: Any) -> str:
+    """ " for 10 h/week", or nothing when the entry doesn't record the hours (they didn't change)."""
+    return f" for {_hours(value)}" if value is not None else ""
+
+
 def _label(status: str) -> str:
     return status.replace("_", " ")
 
@@ -87,7 +95,7 @@ class _Entry:
 def _assignment(e: _Entry) -> str | None:
     action = e.row["action"]
     if action == "assignment.create":
-        return f"{e.who} added you to {e.project} for {_hours(e.new('hours_per_week'))}"
+        return f"{e.who} added you to {e.project}{_for_hours(e.new('hours_per_week'))}"
     if action == "assignment.request":
         if e.changed("user"):
             return (
@@ -102,7 +110,7 @@ def _assignment(e: _Entry) -> str | None:
         return f"{e.who} changed the hours requested for you on {e.project} to {_hours(e.new('hours_per_week'))}"
     if action == "assignment.update":
         if e.old("status") == "pending":
-            return f"{e.who} added you to {e.project} for {_hours(e.new('hours_per_week'))}"
+            return f"{e.who} added you to {e.project}{_for_hours(e.new('hours_per_week'))}"
         if e.changed("hours_per_week"):
             return (
                 f"{e.who} changed your hours on {e.project} from {_hours(e.old('hours_per_week'))} "
@@ -110,7 +118,11 @@ def _assignment(e: _Entry) -> str | None:
             )
         return f"The requested increase to your hours on {e.project} was cancelled"
     if action == "assignment.approve":
-        return f"{e.who} approved your {_hours(e.new('hours_per_week'))} on {e.project}"
+        # Approving a new assignment leaves its hours unchanged, so only an increase records them.
+        hours = e.new("hours_per_week")
+        if hours is None:
+            return f"{e.who} approved your hours on {e.project}"
+        return f"{e.who} approved your {_hours(hours)} on {e.project}"
     if action == "assignment.reject":
         if e.old("status") == "pending":
             return f"The request for {_hours(e.old('hours_per_week'))} of your time on {e.project} was declined"
@@ -238,7 +250,12 @@ def whats_new(cur: psycopg.Cursor, actor: Actor) -> dict:
     )
     items = []
     for row in cur.fetchall():
-        text = describe(row, actor.employee_id)
+        try:
+            text = describe(row, actor.employee_id)
+        except (TypeError, ValueError, KeyError):
+            # One unexpected entry must never take the whole dashboard down.
+            logger.exception("Could not describe audit entry %s for What's new", row["id"])
+            continue
         if text is None:
             continue
         items.append(
